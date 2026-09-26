@@ -2030,26 +2030,22 @@
         }
 
         // ---------------------------------------------------------
-        // 8. SUPABASE POSTGRESQL & AUTH CLIENT ENGINE
+        
+        // ---------------------------------------------------------
+        // 8. 100% FULLY CLOUD-DRIVEN SUPABASE POSTGRESQL ENGINE
         // ---------------------------------------------------------
         const DEFAULT_SUPABASE_URL = "https://nbxjfqfnxwazoskykgjl.supabase.co";
         const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ieGpmcWZueHdhem9za3lrZ2psIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzNzY3MTEsImV4cCI6MjEwNTk1MjcxMX0.ozEAA4XaL6BrGUPL3D2GOKUCuKwAyqg4AuYfEo8KMao";
         let supabaseClient = null;
+        let currentCloudUser = null;
 
         async function initSupabase() {
-            const url = localStorage.getItem("earnest_supa_url") || DEFAULT_SUPABASE_URL;
-            const key = localStorage.getItem("earnest_supa_key") || DEFAULT_SUPABASE_ANON_KEY;
-
-            if (url && document.getElementById("supa-url")) document.getElementById("supa-url").value = url;
-            if (key && document.getElementById("supa-key")) document.getElementById("supa-key").value = key;
-
             if (window.supabase) {
                 try {
-                    supabaseClient = window.supabase.createClient(url, key);
+                    supabaseClient = window.supabase.createClient(DEFAULT_SUPABASE_URL, DEFAULT_SUPABASE_ANON_KEY);
                     
                     let { data: { user } } = await supabaseClient.auth.getUser();
                     if (!user) {
-                        // Auto authenticate to global account so cross-device sync works out of the box!
                         const { data: signInRes, error: signInErr } = await supabaseClient.auth.signInWithPassword({
                             email: 'alumayerbusiness@gmail.com',
                             password: 'EarnestGlobalSync2026!'
@@ -2069,23 +2065,26 @@
                     }
 
                     if (user) {
+                        currentCloudUser = user;
                         checkSupabaseUser();
-                        // Realtime Subscription for cross-device live sync
+                        await fetchCloudProfiles();
+                        
+                        // Realtime Subscription for live multi-device sync
                         try {
                             supabaseClient
-                                .channel('db-changes')
+                                .channel('cloud-db-channel')
+                                .on('postgres_changes', { event: '*', schema: 'public', table: 'app_profiles' }, () => {
+                                    fetchCloudProfiles();
+                                })
                                 .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => {
-                                    loadSupabaseData(user.id);
+                                    if (activeProfile) loadCloudDataForProfile(activeProfile.id);
                                 })
                                 .on('postgres_changes', { event: '*', schema: 'public', table: 'employers' }, () => {
-                                    loadSupabaseData(user.id);
-                                })
-                                .on('postgres_changes', { event: '*', schema: 'public', table: 'app_profiles' }, () => {
-                                    loadSupabaseData(user.id);
+                                    if (activeProfile) loadCloudDataForProfile(activeProfile.id);
                                 })
                                 .subscribe();
                         } catch(reErr) {
-                            console.log("Realtime subscription note:", reErr);
+                            console.log("Realtime note:", reErr);
                         }
                     }
                 } catch (e) {
@@ -2094,22 +2093,148 @@
             }
         }
 
-        async function syncShiftToSupabase(s) {
-            if (!supabaseClient) return;
+        async function fetchCloudProfiles() {
+            if (!supabaseClient || !currentCloudUser) return;
             try {
-                let { data: { user } } = await supabaseClient.auth.getUser();
-                if (!user) {
-                    await supabaseClient.auth.signInWithPassword({
-                        email: 'alumayerbusiness@gmail.com',
-                        password: 'EarnestGlobalSync2026!'
-                    });
-                    const res = await supabaseClient.auth.getUser();
-                    user = res.data?.user;
-                }
-                if (!user) return;
+                const { data: dbProfiles } = await supabaseClient
+                    .from('app_profiles')
+                    .select('*')
+                    .order('created_at', { ascending: true });
 
+                if (dbProfiles && dbProfiles.length > 0) {
+                    profiles = dbProfiles.map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        avatar: p.avatar || p.name.charAt(0).toUpperCase(),
+                        pin: p.pin || null,
+                        isAdmin: p.is_admin || false,
+                        employers: [],
+                        shifts: [],
+                        payslips: [],
+                        goals: { hours: 100, net: 15000, shifts: 20 }
+                    }));
+                } else {
+                    const mainP = {
+                        id: 'p_admin',
+                        user_id: currentCloudUser.id,
+                        name: 'Main Profile',
+                        avatar: 'M',
+                        pin: null,
+                        is_admin: true
+                    };
+                    await supabaseClient.from('app_profiles').insert(mainP);
+                    profiles = [{
+                        id: 'p_admin',
+                        name: 'Main Profile',
+                        avatar: 'M',
+                        pin: null,
+                        isAdmin: true,
+                        employers: [],
+                        shifts: [],
+                        payslips: [],
+                        goals: { hours: 100, net: 15000, shifts: 20 }
+                    }];
+                }
+
+                renderProfilesGrid();
+                renderAdminProfilesList();
+                showProfileScreen();
+            } catch(e) {
+                console.error("Error fetching cloud profiles:", e);
+            }
+        }
+
+        async function loadCloudDataForProfile(profileId) {
+            if (!supabaseClient || !currentCloudUser || !profileId) return;
+            try {
+                const targetP = profiles.find(p => p.id === profileId);
+                if (!targetP) return;
+
+                // Fetch Employers from Cloud
+                const { data: dbEmp } = await supabaseClient
+                    .from('employers')
+                    .select('*, roles(*)')
+                    .eq('profile_id', profileId);
+
+                if (dbEmp) {
+                    targetP.employers = dbEmp.map(e => ({
+                        id: e.id,
+                        name: e.name,
+                        location: e.location || 'Stockholm',
+                        default_tax_rate: parseFloat(e.default_tax_rate || 0.32),
+                        notes: e.notes || '',
+                        roles: (e.roles || []).map(r => ({
+                            id: r.id,
+                            role_name: r.role_name,
+                            hourly_rate: parseFloat(r.hourly_rate)
+                        }))
+                    }));
+                }
+
+                // Fetch Shifts from Cloud
+                const { data: dbShifts } = await supabaseClient
+                    .from('shifts')
+                    .select('*')
+                    .eq('profile_id', profileId)
+                    .order('date', { ascending: false });
+
+                if (dbShifts) {
+                    targetP.shifts = dbShifts.map(s => ({
+                        id: s.id,
+                        employer_name: s.employer_name,
+                        role_name: s.role_name,
+                        date: s.date,
+                        start_time: s.start_time,
+                        end_time: s.end_time,
+                        unpaid_break_mins: s.unpaid_break_mins || 0,
+                        paid_hours: parseFloat(s.paid_hours),
+                        hourly_rate: parseFloat(s.hourly_rate),
+                        gross_pay: parseFloat(s.gross_pay),
+                        ob_pay: parseFloat(s.ob_pay || 0),
+                        tips: parseFloat(s.tips || 0),
+                        expenses: parseFloat(s.expenses || 0),
+                        net_pay: parseFloat(s.net_pay),
+                        status: s.status || 'worked',
+                        notes: s.notes || ''
+                    }));
+                }
+
+                // Fetch Payslips from Cloud
+                const { data: dbPayslips } = await supabaseClient
+                    .from('payslips')
+                    .select('*')
+                    .eq('profile_id', profileId)
+                    .order('pay_period_start', { ascending: false });
+
+                if (dbPayslips) {
+                    targetP.payslips = dbPayslips.map(p => ({
+                        id: p.id,
+                        employer_name: p.employer_name,
+                        pay_period_start: p.pay_period_start,
+                        pay_period_end: p.pay_period_end,
+                        actual_gross: parseFloat(p.actual_gross),
+                        actual_net: parseFloat(p.actual_net)
+                    }));
+                }
+
+                activeProfile = targetP;
+                renderDashboard();
+                loadEmployers();
+                loadEmployersOptions();
+                renderLedger();
+                renderCalendar();
+                loadPayslips();
+            } catch(e) {
+                console.error("Error loading cloud profile data:", e);
+            }
+        }
+
+        async function syncShiftToSupabase(s) {
+            if (!supabaseClient || !currentCloudUser || !activeProfile) return;
+            try {
                 const payload = {
-                    user_id: user.id,
+                    user_id: currentCloudUser.id,
+                    profile_id: activeProfile.id,
                     employer_name: s.employer_name,
                     role_name: s.role_name,
                     date: s.date,
@@ -2135,7 +2260,6 @@
                     const { data: inserted } = await supabaseClient.from('shifts').insert(payload).select().single();
                     if (inserted && inserted.id) {
                         s.id = inserted.id;
-                        saveProfiles();
                     }
                 }
             } catch(e) {
@@ -2144,12 +2268,11 @@
         }
 
         async function syncEmployerToSupabase(emp) {
-            if (!supabaseClient) return;
+            if (!supabaseClient || !currentCloudUser || !activeProfile) return;
             try {
-                let { data: { user } } = await supabaseClient.auth.getUser();
-                if (!user) return;
                 const { data: empRes } = await supabaseClient.from('employers').insert({
-                    user_id: user.id,
+                    user_id: currentCloudUser.id,
+                    profile_id: activeProfile.id,
                     name: emp.name,
                     location: emp.location || 'Stockholm',
                     default_tax_rate: emp.default_tax_rate || 0.32,
@@ -2160,7 +2283,8 @@
                     for (const r of emp.roles) {
                         await supabaseClient.from('roles').insert({
                             employer_id: empRes.id,
-                            user_id: user.id,
+                            user_id: currentCloudUser.id,
+                            profile_id: activeProfile.id,
                             role_name: r.role_name,
                             hourly_rate: r.hourly_rate
                         });
@@ -2171,47 +2295,16 @@
             }
         }
 
-        async function syncProfileToSupabase(p) {
-            if (!supabaseClient) return;
-            try {
-                let { data: { user } } = await supabaseClient.auth.getUser();
-                if (!user) return;
-                await supabaseClient.from('app_profiles').upsert({
-                    id: p.id,
-                    user_id: user.id,
-                    name: p.name,
-                    avatar: p.avatar || p.name.charAt(0).toUpperCase(),
-                    pin: p.pin || null,
-                    is_admin: p.isAdmin || false
-                });
-            } catch(e) {
-                console.error("Profile Supabase sync error:", e);
-            }
-        }
-
-        async function deleteProfileFromSupabase(profileId) {
-            if (!supabaseClient) return;
-            try {
-                let { data: { user } } = await supabaseClient.auth.getUser();
-                if (!user) return;
-                await supabaseClient.from('app_profiles').delete().eq('id', profileId).eq('user_id', user.id);
-            } catch(e) {
-                console.error("Profile Supabase deletion error:", e);
-            }
-        }
-
         async function deleteShiftFromSupabase(shiftId, shiftObj) {
-            if (!supabaseClient) return;
+            if (!supabaseClient || !currentCloudUser) return;
             try {
-                let { data: { user } } = await supabaseClient.auth.getUser();
-                if (!user) return;
-                
                 const sid = String(shiftId);
                 if (sid.includes('-')) {
-                    await supabaseClient.from('shifts').delete().eq('id', sid).eq('user_id', user.id);
-                } else if (shiftObj) {
+                    await supabaseClient.from('shifts').delete().eq('id', sid).eq('user_id', currentCloudUser.id);
+                } else if (shiftObj && activeProfile) {
                     await supabaseClient.from('shifts').delete()
-                        .eq('user_id', user.id)
+                        .eq('user_id', currentCloudUser.id)
+                        .eq('profile_id', activeProfile.id)
                         .eq('date', shiftObj.date)
                         .eq('start_time', shiftObj.start_time)
                         .eq('employer_name', shiftObj.employer_name);
@@ -2221,374 +2314,69 @@
             }
         }
 
-        async function loadSupabaseData(userId) {
-            if (!supabaseClient || !userId) return;
-            try {
-                // Fetch App Profiles from Supabase
-                const { data: dbAppProfiles } = await supabaseClient.from('app_profiles').select('*').order('created_at', { ascending: true });
-                if (dbAppProfiles && dbAppProfiles.length > 0) {
-                    const profileMap = new Map((profiles || []).map(p => [p.id, p]));
-                    profiles = dbAppProfiles.map(ap => {
-                        const existing = profileMap.get(ap.id) || {};
-                        return {
-                            id: ap.id,
-                            name: ap.name,
-                            avatar: ap.avatar || ap.name.charAt(0).toUpperCase(),
-                            pin: ap.pin || null,
-                            isAdmin: ap.is_admin || false,
-                            employers: existing.employers || defaultEmployers,
-                            shifts: existing.shifts || [],
-                            payslips: existing.payslips || [],
-                            goals: existing.goals || { hours: 100, net: 15000, shifts: 20 }
-                        };
-                    });
-                    saveProfiles();
-                    renderProfilesGrid();
-                    renderAdminProfilesList();
-                } else if (profiles && profiles.length > 0) {
-                    // Auto-sync existing local profiles to Supabase cloud
-                    for (const p of profiles) {
-                        await syncProfileToSupabase(p);
-                    }
-                }
+        async function adminCreateProfile(e) {
+            e.preventDefault();
+            const name = document.getElementById("admin-new-name").value.trim();
+            const pinVal = document.getElementById("admin-new-pin")?.value.trim();
 
-                // Fetch Employers
-                const { data: dbEmployers } = await supabaseClient.from('employers').select('*, roles(*)');
-                if (dbEmployers && dbEmployers.length > 0) {
-                    activeProfile = getActiveProfile();
-                    activeProfile.employers = dbEmployers.map(emp => ({
-                        id: emp.id,
-                        name: emp.name,
-                        location: emp.location || 'Stockholm',
-                        default_tax_rate: parseFloat(emp.default_tax_rate || 0.32),
-                        notes: emp.notes || '',
-                        roles: (emp.roles || []).map(r => ({
-                            id: r.id,
-                            role_name: r.role_name,
-                            hourly_rate: parseFloat(r.hourly_rate)
-                        }))
-                    }));
-                    loadEmployers();
-                    loadEmployersOptions();
-                }
-
-                // Fetch Shifts
-                const { data: dbShifts } = await supabaseClient.from('shifts').select('*').order('date', { ascending: false });
-                if (dbShifts && dbShifts.length > 0) {
-                    activeProfile = getActiveProfile();
-                    activeProfile.shifts = dbShifts.map(s => ({
-                        id: s.id,
-                        employer_name: s.employer_name,
-                        role_name: s.role_name,
-                        date: s.date,
-                        start_time: s.start_time,
-                        end_time: s.end_time,
-                        unpaid_break_mins: s.unpaid_break_mins,
-                        paid_hours: parseFloat(s.paid_hours),
-                        hourly_rate: parseFloat(s.hourly_rate),
-                        gross_pay: parseFloat(s.gross_pay),
-                        ob_pay: parseFloat(s.ob_pay || 0),
-                        tips: parseFloat(s.tips || 0),
-                        expenses: parseFloat(s.expenses || 0),
-                        net_pay: parseFloat(s.net_pay),
-                        status: s.status || 'worked',
-                        notes: s.notes || ''
-                    }));
-                    renderDashboard();
-                    renderLedger();
-                    renderCalendar();
-                }
-
-                // Fetch Payslips
-                const { data: dbPayslips } = await supabaseClient.from('payslips').select('*').order('pay_period_start', { ascending: false });
-                if (dbPayslips && dbPayslips.length > 0) {
-                    activeProfile = getActiveProfile();
-                    activeProfile.payslips = dbPayslips.map(p => ({
-                        id: p.id,
-                        employer_name: p.employer_name,
-                        pay_period_start: p.pay_period_start,
-                        pay_period_end: p.pay_period_end,
-                        actual_gross: parseFloat(p.actual_gross),
-                        actual_net: parseFloat(p.actual_net)
-                    }));
-                    loadPayslips();
-                }
-
-                saveProfiles();
-                autoSyncLocalDataToSupabase(userId);
-            } catch (e) {
-                console.error("Error loading Supabase data:", e);
-            }
-        }
-
-        async function autoSyncLocalDataToSupabase(userId) {
-            if (!supabaseClient || !userId || !activeProfile) return;
-            try {
-                const localShifts = activeProfile.shifts || [];
-                for (const s of localShifts) {
-                    if (typeof s.id === 'number' || !String(s.id).includes('-')) {
-                        await syncShiftToSupabase(s);
-                    }
-                }
-            } catch(e) {
-                console.error("Auto sync error:", e);
-            }
-        }
-
-        function saveSupabaseConfig() {
-            const url = document.getElementById("supa-url").value.trim();
-            const key = document.getElementById("supa-key").value.trim();
-
-            if (!url || !key) {
-                alert("Please enter both your Supabase Project URL and Anon API Key.");
+            if (!name) {
+                alert("Please enter a profile name.");
                 return;
             }
 
-            localStorage.setItem("earnest_supa_url", url);
-            localStorage.setItem("earnest_supa_key", key);
+            const newId = "p_" + Date.now();
+            const pin = (pinVal && pinVal.length === 4) ? pinVal : null;
 
-            if (window.supabase) {
-                supabaseClient = window.supabase.createClient(url, key);
-                alert("Supabase connected! You can now Sign In or Sign Up.");
-                checkSupabaseUser();
+            if (supabaseClient && currentCloudUser) {
+                await supabaseClient.from('app_profiles').insert({
+                    id: newId,
+                    user_id: currentCloudUser.id,
+                    name: name,
+                    avatar: name.charAt(0).toUpperCase(),
+                    pin: pin,
+                    is_admin: false
+                });
             }
+
+            closeModal("modal-admin");
+            document.getElementById("admin-new-name").value = "";
+            if (document.getElementById("admin-new-pin")) document.getElementById("admin-new-pin").value = "";
+            
+            alert(`Profile '${name}' created in Cloud!`);
+            await fetchCloudProfiles();
         }
 
-        function openCloudModal() {
-            const url = localStorage.getItem("earnest_supa_url") || "";
-            const key = localStorage.getItem("earnest_supa_key") || "";
-            if (url && document.getElementById("modal-supa-url")) document.getElementById("modal-supa-url").value = url;
-            if (key && document.getElementById("modal-supa-key")) document.getElementById("modal-supa-key").value = key;
-            document.getElementById("modal-cloud-account").classList.remove("hidden");
-            checkSupabaseUser();
+        async function adminDeleteProfile(id) {
+            if (!confirm("Delete this profile from Cloud PostgreSQL?")) return;
+            if (supabaseClient && currentCloudUser) {
+                await supabaseClient.from('app_profiles').delete().eq('id', id).eq('user_id', currentCloudUser.id);
+            }
+            await fetchCloudProfiles();
         }
 
-        function saveModalSupabaseConfig() {
-            const url = document.getElementById("modal-supa-url").value.trim();
-            const key = document.getElementById("modal-supa-key").value.trim();
-            if (!url || !key) { alert("Please enter both Supabase URL and Anon Key."); return; }
-            localStorage.setItem("earnest_supa_url", url);
-            localStorage.setItem("earnest_supa_key", key);
-            if (window.supabase) {
-                supabaseClient = window.supabase.createClient(url, key);
-                alert("Supabase connected!");
-                checkSupabaseUser();
-            }
+        async function activateProfile(p) {
+            if (!p) return;
+            document.getElementById("screen-profiles").classList.add("hidden");
+            document.getElementById("app-main").classList.remove("hidden");
+
+            if (document.getElementById("header-avatar")) document.getElementById("header-avatar").innerText = p.avatar || p.name.charAt(0);
+            if (document.getElementById("header-profile-name")) document.getElementById("header-profile-name").innerText = p.name;
+
+            await loadCloudDataForProfile(p.id);
         }
 
-        async function modalSupaSignIn() {
-            const email = document.getElementById("modal-supa-email").value.trim();
-            const password = document.getElementById("modal-supa-pass").value.trim();
-            if (!email || !password) { alert("Please enter email and password."); return; }
-
-            if (!supabaseClient) {
-                const url = localStorage.getItem("earnest_supa_url") || document.getElementById("modal-supa-url")?.value.trim();
-                const key = localStorage.getItem("earnest_supa_key") || document.getElementById("modal-supa-key")?.value.trim();
-                if (url && key && window.supabase) {
-                    supabaseClient = window.supabase.createClient(url, key);
-                } else {
-                    alert("Please enter your Supabase URL & Anon Key under Advanced Credentials first.");
-                    return;
-                }
-            }
-
-            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) {
-                alert("Sign In error: " + error.message);
-            } else {
-                alert("Signed in successfully to your Supabase PostgreSQL cloud account!");
-                closeModal("modal-cloud-account");
-                checkSupabaseUser();
-            }
+        function loadProfiles() {
+            initSupabase();
         }
 
-        async function modalSupaSignUp() {
-            const email = document.getElementById("modal-supa-email").value.trim();
-            const password = document.getElementById("modal-supa-pass").value.trim();
-            if (!email || !password) { alert("Please enter email and password."); return; }
-
-            if (!supabaseClient) {
-                const url = localStorage.getItem("earnest_supa_url") || document.getElementById("modal-supa-url")?.value.trim();
-                const key = localStorage.getItem("earnest_supa_key") || document.getElementById("modal-supa-key")?.value.trim();
-                if (url && key && window.supabase) {
-                    supabaseClient = window.supabase.createClient(url, key);
-                } else {
-                    alert("Please enter your Supabase URL & Anon Key under Advanced Credentials first.");
-                    return;
-                }
-            }
-
-            const { data, error } = await supabaseClient.auth.signUp({ email, password });
-            if (error) {
-                alert("Sign Up error: " + error.message);
-            } else {
-                alert("Account created successfully!");
-                checkSupabaseUser();
-            }
+        function saveProfiles() {
+            // Cloud-driven; no local storage needed
         }
 
-        async function checkSupabaseUser() {
-            if (!supabaseClient) return;
-            const { data: { user } } = await supabaseClient.auth.getUser();
-            const badge = document.getElementById("supa-status-badge");
-            const modalBadge = document.getElementById("modal-supa-badge");
-            const frontBadge = document.getElementById("front-supa-badge");
-            const frontDesc = document.getElementById("front-supa-desc");
-
-            if (user) {
-                const label = `Connected: ${user.email}`;
-                if (badge) { badge.innerText = label; badge.className = "text-xs bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full"; }
-                if (modalBadge) { modalBadge.innerText = label; modalBadge.className = "text-xs bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full"; }
-                if (frontBadge) { frontBadge.innerText = "Cloud Active 🟢"; frontBadge.className = "text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full"; }
-                if (frontDesc) { frontDesc.innerText = `Signed in as ${user.email} (PostgreSQL cloud database)`; }
-                loadSupabaseData(user.id);
-            } else {
-                const label = "Supabase Connected (Signed Out)";
-                if (badge) { badge.innerText = label; badge.className = "text-xs bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded-full"; }
-                if (modalBadge) { modalBadge.innerText = label; modalBadge.className = "text-xs bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded-full"; }
-                if (frontBadge) { frontBadge.innerText = "Offline / Local Mode"; frontBadge.className = "text-[10px] bg-stone-100 text-stone-600 font-bold px-2 py-0.5 rounded-full"; }
-                if (frontDesc) { frontDesc.innerText = "Permanent PostgreSQL history across iPhone, iPad & PC"; }
-            }
-        }
-
-        async function supaSignUp() {
-            if (!supabaseClient) { alert("Please connect your Supabase project credentials first."); return; }
-            const email = document.getElementById("supa-email").value.trim();
-            const password = document.getElementById("supa-pass").value.trim();
-            if (!email || !password) { alert("Please enter an email address and password."); return; }
-
-            const { data, error } = await supabaseClient.auth.signUp({ email, password });
-            if (error) {
-                alert("Sign Up error: " + error.message);
-            } else {
-                alert("Account created successfully! Check your email or sign in now.");
-                checkSupabaseUser();
-            }
-        }
-
-        async function supaSignIn() {
-            if (!supabaseClient) { alert("Please connect your Supabase project credentials first."); return; }
-            const email = document.getElementById("supa-email").value.trim();
-            const password = document.getElementById("supa-pass").value.trim();
-            if (!email || !password) { alert("Please enter email and password."); return; }
-
-            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-            if (error) {
-                alert("Sign In error: " + error.message);
-            } else {
-                alert("Signed in successfully to your Supabase PostgreSQL cloud account!");
-                checkSupabaseUser();
-            }
-        }
-
-        async function migrateLocalDataToSupabase() {
-            if (!supabaseClient) { alert("Please connect and sign in to Supabase first."); return; }
-            const { data: { user } } = await supabaseClient.auth.getUser();
-            if (!user) { alert("Please sign in to your Supabase user account before migrating data."); return; }
-            if (!activeProfile) { alert("No active local profile selected."); return; }
-
-            try {
-                const employers = activeProfile.employers || [];
-                for (const emp of employers) {
-                    const { data: empRes } = await supabaseClient.from('employers').insert({
-                        user_id: user.id,
-                        name: emp.name,
-                        location: emp.location || 'Stockholm',
-                        default_tax_rate: emp.default_tax_rate || 0.32,
-                        notes: emp.notes || ''
-                    }).select().single();
-
-                    if (empRes) {
-                        const roles = emp.roles || [];
-                        for (const r of roles) {
-                            await supabaseClient.from('roles').insert({
-                                employer_id: empRes.id,
-                                user_id: user.id,
-                                role_name: r.role_name,
-                                hourly_rate: r.hourly_rate
-                            });
-                        }
-                    }
-                }
-
-                const shifts = activeProfile.shifts || [];
-                for (const s of shifts) {
-                    await supabaseClient.from('shifts').insert({
-                        user_id: user.id,
-                        employer_name: s.employer_name,
-                        role_name: s.role_name,
-                        date: s.date,
-                        start_time: s.start_time,
-                        end_time: s.end_time,
-                        unpaid_break_mins: s.unpaid_break_mins || 0,
-                        paid_hours: s.paid_hours,
-                        hourly_rate: s.hourly_rate,
-                        gross_pay: s.gross_pay,
-                        ob_pay: s.ob_pay || 0,
-                        tips: s.tips || 0,
-                        expenses: s.expenses || 0,
-                        net_pay: s.net_pay,
-                        status: s.status || 'worked',
-                        notes: s.notes || ''
-                    });
-                }
-
-                const payslips = activeProfile.payslips || [];
-                for (const p of payslips) {
-                    await supabaseClient.from('payslips').insert({
-                        user_id: user.id,
-                        employer_name: p.employer_name,
-                        pay_period_start: p.pay_period_start,
-                        pay_period_end: p.pay_period_end,
-                        actual_gross: p.actual_gross,
-                        actual_net: p.actual_net
-                    });
-                }
-
-                alert("🎉 Migration Complete! All local shifts, employers, and payslips are now permanently saved in your Supabase account.");
-                loadSupabaseData(user.id);
-            } catch (err) {
-                alert("Migration error: " + err.message);
-            }
-        }
-
-        async function loadSupabaseData(userId) {
-            if (!supabaseClient || !userId) return;
-            try {
-                const { data: shifts } = await supabaseClient.from('shifts').select('*').order('date', { ascending: false });
-                if (shifts && shifts.length > 0) {
-                    activeProfile = getActiveProfile();
-                    activeProfile.shifts = shifts.map(s => ({
-                        id: s.id,
-                        employer_name: s.employer_name,
-                        role_name: s.role_name,
-                        date: s.date,
-                        start_time: s.start_time,
-                        end_time: s.end_time,
-                        unpaid_break_mins: s.unpaid_break_mins,
-                        paid_hours: parseFloat(s.paid_hours),
-                        hourly_rate: parseFloat(s.hourly_rate),
-                        gross_pay: parseFloat(s.gross_pay),
-                        ob_pay: parseFloat(s.ob_pay || 0),
-                        tips: parseFloat(s.tips || 0),
-                        expenses: parseFloat(s.expenses || 0),
-                        net_pay: parseFloat(s.net_pay),
-                        status: s.status || 'worked',
-                        notes: s.notes || ''
-                    }));
-                    renderDashboard();
-                    renderLedger();
-                    renderCalendar();
-                }
-            } catch (e) {
-                console.error("Error loading Supabase data:", e);
-            }
-        }
-
-        // Initialize Supabase on page load
         document.addEventListener("DOMContentLoaded", () => {
             initSupabase();
         });
+    
     </script>
 </body>
 </html>
