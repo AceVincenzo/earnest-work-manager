@@ -1,0 +1,2082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Earnest — Personal Work & Payroll Management System</title>
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1C2E24">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cream: { 50: '#FAF8F5', 100: '#F5F2EA', 200: '#EBE6D8', 900: '#2A261F' },
+                        forest: { 800: '#1C2E24', 900: '#14221A', 950: '#0E1712' },
+                        rust: { 500: '#C85A32', 600: '#B34C26', 700: '#943B1B' }
+                    },
+                    fontFamily: {
+                        serif: ['DM Serif Display', 'Georgia', 'serif'],
+                        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Supabase JS Client SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; background-color: #FAF8F5; color: #1C2E24; }
+        .font-serif { font-family: 'DM Serif Display', Georgia, serif; }
+        .card-shadow { box-shadow: 0 10px 30px -5px rgba(28, 46, 36, 0.05), 0 4px 12px -2px rgba(28, 46, 36, 0.03); }
+        .dark-card-shadow { box-shadow: 0 20px 40px -10px rgba(14, 23, 18, 0.4); }
+        @media print {
+            header, nav, button, .no-print { display: none !important; }
+            body { background: white; color: black; }
+            .print-only { display: block !important; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased">
+
+    <!-- 1. PROFILE SELECTION SCREEN (Netflix-style) -->
+    <div id="screen-profiles" class="fixed inset-0 bg-[#FAF8F5] z-50 flex flex-col items-center justify-center p-6 space-y-8">
+        <div class="text-center space-y-2">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-forest-900 text-cream-50 font-serif text-3xl font-bold mb-2 shadow-xl">E</div>
+            <h1 class="text-3xl md:text-5xl font-serif text-forest-900">Earnest Work & Payroll</h1>
+            <p class="text-sm text-stone-500">Select your profile to view your work shifts & salary management</p>
+        </div>
+
+        <div id="profiles-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-xl w-full"></div>
+    </div>
+
+    <!-- 2. PIN PAD MODAL -->
+    <div id="modal-pin" class="fixed inset-0 bg-forest-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-[#FAF8F5] border border-stone-200 rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center space-y-6">
+            <div class="space-y-1">
+                <h3 id="pin-profile-name" class="font-serif text-2xl text-forest-900">Enter PIN</h3>
+                <p class="text-xs text-stone-500">Protected Profile Access</p>
+            </div>
+
+            <!-- PIN Dots -->
+            <div class="flex items-center justify-center gap-3 py-2">
+                <div id="pin-dot-1" class="w-4 h-4 rounded-full border-2 border-forest-900 transition"></div>
+                <div id="pin-dot-2" class="w-4 h-4 rounded-full border-2 border-forest-900 transition"></div>
+                <div id="pin-dot-3" class="w-4 h-4 rounded-full border-2 border-forest-900 transition"></div>
+                <div id="pin-dot-4" class="w-4 h-4 rounded-full border-2 border-forest-900 transition"></div>
+            </div>
+
+            <!-- Keypad Grid -->
+            <div class="grid grid-cols-3 gap-3 pt-2">
+                <button type="button" onclick="pressPin('1')" class="py-3.5 bg-stone-100 hover:bg-stone-200 rounded-2xl font-bold text-lg text-forest-900">1</button>
+                <button type="button" onclick="pressPin('2')" class="py-3.5 bg-stone-100 hover:bg-stone-200 rounded-2xl font-bold text-lg text-forest-900">2</button>
+                <button type="button" onclick="pressPin('3')" class="py-3.5 bg-stone-100 hover:bg-stone-200 rounded-2xl font-bold text-lg text-forest-900">3</button>
+                <button type="button" onclick="pressPin('4')" class="py-3.5 bg-stone-100 hover:bg-stone-200 rounded-2xl font-bold text-lg text-forest-900">4</button>
+                <button type="button" onclick="pressPin('5')" class="py-3.5 bg-stone-100 hover:bg-stone-200 rounded-2xl font-bold text-lg text-forest-900">5</button>
+                <button type="button" onclick="pressPin('6')" class="py-3.5 bg-stone-100 hover:bg-stone-200 rounded-2xl font-bold text-lg text-forest-900">6</button>
+                <button type="button" onclick="pressPin('7')" class="py-3.5 bg-stone-100 hover:bg-stone-200 rounded-2xl font-bold text-lg text-forest-900">7</button>
+                <button type="button" onclick="pressPin('8')" class="py-3.5 bg-stone-100 hover:bg-stone-200 rounded-2xl font-bold text-lg text-forest-900">8</button>
+                <button type="button" onclick="pressPin('9')" class="py-3.5 bg-stone-100 hover:bg-stone-200 rounded-2xl font-bold text-lg text-forest-900">9</button>
+                <button type="button" onclick="clearPin()" class="py-3.5 bg-stone-200 text-stone-600 rounded-2xl font-semibold text-xs">CLR</button>
+                <button type="button" onclick="pressPin('0')" class="py-3.5 bg-stone-100 hover:bg-stone-200 rounded-2xl font-bold text-lg text-forest-900">0</button>
+                <button type="button" onclick="backspacePin()" class="py-3.5 bg-stone-200 text-stone-600 rounded-2xl font-semibold text-xs">⌫</button>
+            </div>
+
+            <button type="button" onclick="closeModal('modal-pin')" class="text-xs text-stone-500 hover:text-stone-700">Cancel & Switch Profile</button>
+        </div>
+    </div>
+
+    <!-- MAIN APP WRAPPER -->
+    <div id="app-main" class="hidden flex-1 flex flex-col">
+        <!-- TOP HEADER BAR -->
+        <header class="border-b border-stone-200/80 bg-[#FAF8F5]/95 backdrop-blur-md sticky top-0 z-30">
+            <div class="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between">
+                <!-- Logo -->
+                <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('dashboard')">
+                    <div class="w-9 h-9 rounded-xl bg-forest-900 text-cream-50 flex items-center justify-center font-serif font-bold text-lg shadow-md">E</div>
+                    <div>
+                        <span class="font-serif text-xl font-bold text-forest-900 tracking-tight block leading-none">Earnest</span>
+                        <span class="text-[10px] text-rust-500 font-bold uppercase tracking-widest block pt-0.5">Work & Payroll</span>
+                    </div>
+                </div>
+
+                <!-- Month Selector -->
+                <div class="hidden sm:flex items-center gap-2 bg-stone-100/90 border border-stone-200 px-3 py-1.5 rounded-full text-xs font-semibold text-stone-700">
+                    <button type="button" onclick="changeMonth(-1)" class="hover:text-forest-900 p-0.5"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                    <span id="header-month-title">SEPTEMBER 2026</span>
+                    <button type="button" onclick="changeMonth(1)" class="hover:text-forest-900 p-0.5"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+                </div>
+
+                <!-- Right Actions & Active Profile -->
+                <div class="flex items-center gap-2.5">
+                    <button type="button" onclick="openShiftModal()" class="bg-forest-900 hover:bg-forest-800 text-cream-50 font-semibold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-md transition">
+                        <i data-lucide="plus" class="w-4 h-4 text-rust-500"></i> <span class="hidden xs:inline">Log</span> Shift
+                    </button>
+                    
+                    <button type="button" onclick="openAdminModal()" class="bg-rust-500 hover:bg-rust-600 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-sm transition">
+                        <i data-lucide="shield-check" class="w-4 h-4"></i> <span class="hidden sm:inline">Admin</span>
+                    </button>
+
+                    <button type="button" onclick="showProfileScreen()" title="Switch Profile" class="flex items-center gap-2 p-1.5 bg-stone-100 hover:bg-stone-200 border border-stone-200 rounded-xl transition">
+                        <div id="header-avatar" class="w-7 h-7 rounded-lg bg-rust-500 text-white font-bold text-xs flex items-center justify-center">M</div>
+                        <span id="header-profile-name" class="text-xs font-semibold text-forest-900 hidden md:inline">Main</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- NAVIGATION TAB BAR (22-Feature Blueprint Structure) -->
+            <nav class="border-t border-stone-200/60 bg-stone-100/50 overflow-x-auto scrollbar-none">
+                <div class="max-w-6xl mx-auto px-4 flex items-center space-x-1 py-1.5 text-xs font-semibold">
+                    <button type="button" onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 bg-forest-900 text-cream-50">
+                        <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i> Dashboard
+                    </button>
+                    <button type="button" onclick="switchTab('work')" id="nav-work" class="nav-btn px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 text-stone-600 hover:bg-stone-200/70">
+                        <i data-lucide="clock" class="w-3.5 h-3.5"></i> Work & Calendar
+                    </button>
+                    <button type="button" onclick="switchTab('money')" id="nav-money" class="nav-btn px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 text-stone-600 hover:bg-stone-200/70">
+                        <i data-lucide="wallet" class="w-3.5 h-3.5"></i> Money & Payslips
+                    </button>
+                    <button type="button" onclick="switchTab('analytics')" id="nav-analytics" class="nav-btn px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 text-stone-600 hover:bg-stone-200/70">
+                        <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i> Analytics & Goals
+                    </button>
+                    <button type="button" onclick="switchTab('employers')" id="nav-employers" class="nav-btn px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 text-stone-600 hover:bg-stone-200/70">
+                        <i data-lucide="building-2" class="w-3.5 h-3.5"></i> Employers
+                    </button>
+                    <button type="button" onclick="switchTab('reports')" id="nav-reports" class="nav-btn px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 text-stone-600 hover:bg-stone-200/70">
+                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Reports
+                    </button>
+                    <button type="button" onclick="switchTab('settings')" id="nav-settings" class="nav-btn px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 text-stone-600 hover:bg-stone-200/70">
+                        <i data-lucide="settings" class="w-3.5 h-3.5"></i> Settings & Sync
+                    </button>
+                </div>
+            </nav>
+        </header>
+
+        <!-- MAIN CONTAINER -->
+        <main class="max-w-6xl mx-auto w-full px-4 py-6 space-y-8 flex-1">
+
+            <!-- TAB 1: 🏠 DASHBOARD -->
+            <section id="tab-content-dashboard" class="tab-view space-y-6">
+                <!-- Welcome Greeting & Quick Action Ribbon -->
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-stone-200 p-6 rounded-3xl card-shadow">
+                    <div>
+                        <span class="text-[11px] font-extrabold tracking-widest text-rust-500 uppercase block">GOOD EVENING 👋</span>
+                        <h1 class="text-3xl font-serif text-forest-900 mt-0.5">Welcome back to Earnest</h1>
+                        <p class="text-xs text-stone-500 mt-1">Here is your work shift breakdown and projected salary for September 2026.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" onclick="openShiftModal('worked')" class="bg-forest-900 hover:bg-forest-800 text-cream-50 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm transition">
+                            <i data-lucide="plus" class="w-4 h-4 text-rust-500"></i> + Add Shift
+                        </button>
+                        <button type="button" onclick="openShiftModal('scheduled')" class="bg-stone-100 hover:bg-stone-200 text-forest-900 font-bold px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-1.5 border border-stone-200 transition">
+                            <i data-lucide="calendar" class="w-4 h-4 text-rust-500"></i> Schedule Shift
+                        </button>
+                        <button type="button" onclick="openPayslipModal()" class="bg-stone-100 hover:bg-stone-200 text-forest-900 font-bold px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-1.5 border border-stone-200 transition">
+                            <i data-lucide="receipt" class="w-4 h-4"></i> Upload Payslip
+                        </button>
+                    </div>
+                </div>
+
+                <!-- KPI CARDS ROW -->
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div class="bg-forest-900 text-cream-50 p-4 rounded-2xl space-y-1 shadow-md">
+                        <span class="text-[10px] text-stone-400 uppercase tracking-wider font-mono block">EST. GROSS</span>
+                        <span id="dash-gross" class="font-serif text-xl font-bold text-cream-50 block">0 kr</span>
+                        <span class="text-[10px] text-stone-400 block">Total Base + OB</span>
+                    </div>
+
+                    <div class="bg-white border border-stone-200 p-4 rounded-2xl space-y-1 card-shadow">
+                        <span class="text-[10px] text-stone-400 uppercase tracking-wider font-mono block">EST. NET PAY</span>
+                        <span id="dash-net" class="font-serif text-xl font-bold text-rust-500 block">0 kr</span>
+                        <span class="text-[10px] text-stone-500 block">After ~32% Tax</span>
+                    </div>
+
+                    <div class="bg-white border border-stone-200 p-4 rounded-2xl space-y-1 card-shadow">
+                        <span class="text-[10px] text-stone-400 uppercase tracking-wider font-mono block">HOURS WORKED</span>
+                        <span id="dash-hours" class="font-serif text-xl font-bold text-forest-900 block">0h 00m</span>
+                        <span id="dash-shifts-count" class="text-[10px] text-stone-500 block">0 shifts logged</span>
+                    </div>
+
+                    <div class="bg-white border border-stone-200 p-4 rounded-2xl space-y-1 card-shadow">
+                        <span class="text-[10px] text-stone-400 uppercase tracking-wider font-mono block">TIPS LOGGED</span>
+                        <span id="dash-tips" class="font-serif text-xl font-bold text-emerald-700 block">0 kr</span>
+                        <span class="text-[10px] text-stone-500 block">Restaurant tips</span>
+                    </div>
+
+                    <div class="bg-white border border-stone-200 p-4 rounded-2xl space-y-1 card-shadow">
+                        <span class="text-[10px] text-stone-400 uppercase tracking-wider font-mono block">EXPENSES</span>
+                        <span id="dash-expenses" class="font-serif text-xl font-bold text-stone-600 block">0 kr</span>
+                        <span class="text-[10px] text-stone-500 block">Travel & Parking</span>
+                    </div>
+
+                    <div class="bg-white border border-stone-200 p-4 rounded-2xl space-y-1 card-shadow">
+                        <span class="text-[10px] text-stone-400 uppercase tracking-wider font-mono block">EFFECTIVE RATE</span>
+                        <span id="dash-effective-rate" class="font-serif text-xl font-bold text-forest-900 block">0 kr/h</span>
+                        <span class="text-[10px] text-stone-500 block">Net / Paid Hours</span>
+                    </div>
+                </div>
+
+                <!-- MAIN DASHBOARD CONTENT GRID -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    
+                    <!-- LEFT COLUMN (Upcoming Shift, Insights, Attention Flags) -->
+                    <div class="lg:col-span-7 space-y-6">
+                        
+                        <!-- Upcoming Scheduled Shift Card -->
+                        <div id="upcoming-shift-card" class="bg-white border border-stone-200 rounded-3xl p-6 card-shadow space-y-4">
+                            <div class="flex items-center justify-between border-b border-stone-100 pb-3">
+                                <span class="text-[10px] font-extrabold tracking-widest text-rust-500 uppercase flex items-center gap-1.5">
+                                    <i data-lucide="calendar" class="w-3.5 h-3.5"></i> UPCOMING SCHEDULED SHIFT
+                                </span>
+                                <span class="text-xs bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full font-semibold">Scheduled</span>
+                            </div>
+                            <div id="upcoming-shift-content" class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="font-serif text-xl font-bold text-forest-900">Grand Hôtel</h3>
+                                    <p class="text-xs text-stone-500 mt-0.5">Tomorrow · 16:00 – 23:00 (7h 00m) · Event Runner</p>
+                                </div>
+                                <button type="button" onclick="markNextShiftWorked()" class="bg-rust-500 hover:bg-rust-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md transition">
+                                    Mark as Worked ✓
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 🧠 Earnest Insights Summary -->
+                        <div class="bg-forest-900 text-cream-50 rounded-3xl p-6 space-y-4 dark-card-shadow">
+                            <div class="flex items-center justify-between border-b border-forest-800 pb-3">
+                                <h3 class="font-serif text-lg font-bold text-cream-50 flex items-center gap-2">
+                                    <i data-lucide="sparkles" class="w-4 h-4 text-rust-500"></i> Earnest Insights
+                                </h3>
+                                <span class="text-[10px] text-stone-400 font-mono">SEPTEMBER SUMMARY</span>
+                            </div>
+                            <p id="insight-text" class="text-xs text-stone-300 leading-relaxed">
+                                Loading your shift analytics...
+                            </p>
+                        </div>
+
+                        <!-- Attention Flags / Reminders Box -->
+                        <div class="bg-white border border-stone-200 rounded-3xl p-6 card-shadow space-y-3">
+                            <h4 class="font-serif text-base font-bold text-forest-900 flex items-center gap-2">
+                                <i data-lucide="bell-ring" class="w-4 h-4 text-rust-500"></i> Reminders & Attention Flags
+                            </h4>
+                            <div id="attention-list" class="space-y-2 text-xs text-stone-600"></div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN (Monthly Goals Progress & Projections Preview) -->
+                    <div class="lg:col-span-5 space-y-6">
+                        
+                        <!-- 🎯 Monthly Goals Card -->
+                        <div class="bg-white border border-stone-200 rounded-3xl p-6 card-shadow space-y-5">
+                            <div class="flex items-center justify-between border-b border-stone-100 pb-3">
+                                <h3 class="font-serif text-lg font-bold text-forest-900 flex items-center gap-2">
+                                    <i data-lucide="target" class="w-4 h-4 text-rust-500"></i> Monthly Target Progress
+                                </h3>
+                                <button type="button" onclick="openGoalsModal()" class="text-xs text-rust-500 font-bold hover:underline">Edit Targets</button>
+                            </div>
+
+                            <!-- Hours Goal -->
+                            <div class="space-y-1.5">
+                                <div class="flex justify-between text-xs font-semibold">
+                                    <span class="text-forest-900">Hours Target</span>
+                                    <span id="goal-hours-text" class="text-stone-500">84 / 100 hrs (84%)</span>
+                                </div>
+                                <div class="w-full bg-stone-100 h-2.5 rounded-full overflow-hidden">
+                                    <div id="goal-hours-bar" class="bg-forest-900 h-full rounded-full transition-all" style="width: 84%;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Net Income Goal -->
+                            <div class="space-y-1.5">
+                                <div class="flex justify-between text-xs font-semibold">
+                                    <span class="text-forest-900">Net Income Target</span>
+                                    <span id="goal-net-text" class="text-stone-500">12,842 / 15,000 kr (85.6%)</span>
+                                </div>
+                                <div class="w-full bg-stone-100 h-2.5 rounded-full overflow-hidden">
+                                    <div id="goal-net-bar" class="bg-rust-500 h-full rounded-full transition-all" style="width: 85.6%;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Shifts Target -->
+                            <div class="space-y-1.5">
+                                <div class="flex justify-between text-xs font-semibold">
+                                    <span class="text-forest-900">Shifts Target</span>
+                                    <span id="goal-shifts-text" class="text-stone-500">14 / 20 shifts (70%)</span>
+                                </div>
+                                <div class="w-full bg-stone-100 h-2.5 rounded-full overflow-hidden">
+                                    <div id="goal-shifts-bar" class="bg-emerald-600 h-full rounded-full transition-all" style="width: 70%;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 🔮 "What If?" Calculator Sandbox Preview -->
+                        <div class="bg-white border border-stone-200 rounded-3xl p-6 card-shadow space-y-4">
+                            <h3 class="font-serif text-lg font-bold text-forest-900 flex items-center gap-2">
+                                <i data-lucide="calculator" class="w-4 h-4 text-rust-500"></i> "What If?" Paycheck Simulator
+                            </h3>
+                            <p class="text-xs text-stone-500">Simulate adding extra hours to predict your final month-end salary.</p>
+
+                            <div class="space-y-3 pt-2 text-xs">
+                                <div>
+                                    <div class="flex justify-between mb-1">
+                                        <span class="font-semibold text-stone-700">Add Extra Hours:</span>
+                                        <span id="whatif-hrs-val" class="font-bold text-forest-900">20 hrs</span>
+                                    </div>
+                                    <input type="range" id="whatif-hrs" min="0" max="60" value="20" oninput="calcWhatIf()" class="w-full accent-rust-500">
+                                </div>
+
+                                <div>
+                                    <div class="flex justify-between mb-1">
+                                        <span class="font-semibold text-stone-700">Hourly Rate:</span>
+                                        <span id="whatif-rate-val" class="font-bold text-forest-900">153.64 kr/h</span>
+                                    </div>
+                                    <input type="range" id="whatif-rate" min="95" max="250" value="153.64" step="1" oninput="calcWhatIf()" class="w-full accent-forest-900">
+                                </div>
+                            </div>
+
+                            <div class="bg-stone-50 border border-stone-200 p-4 rounded-2xl flex items-center justify-between text-xs pt-3">
+                                <div>
+                                    <span class="text-stone-500 block">Projected Total Net</span>
+                                    <span id="whatif-proj-net" class="font-serif text-lg font-bold text-forest-900">11,830 kr</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-stone-500 block">Extra Net Pay</span>
+                                    <span id="whatif-extra-net" class="font-serif text-lg font-bold text-rust-500">+2,089 kr</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: ⏱️ WORK & CALENDAR -->
+            <section id="tab-content-work" class="tab-view space-y-6 hidden">
+                
+                <!-- Status Filter & Quick Action Bar -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-4">
+                    <div>
+                        <h2 class="font-serif text-2xl text-forest-900">Work Shifts & Interactive Calendar</h2>
+                        <p class="text-xs text-stone-500">Manage completed shifts, scheduled upcoming work, and calendar tracking.</p>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="openShiftModal('worked')" class="bg-forest-900 hover:bg-forest-800 text-cream-50 font-semibold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 shadow-sm transition">
+                            <i data-lucide="plus" class="w-4 h-4 text-rust-500"></i> Log Shift
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status Filter Buttons -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" onclick="filterShiftStatus('all')" id="filter-all" class="shift-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-bold bg-forest-900 text-cream-50">All Shifts</button>
+                    <button type="button" onclick="filterShiftStatus('worked')" id="filter-worked" class="shift-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-bold bg-stone-100 text-stone-700 hover:bg-stone-200">🟢 Worked</button>
+                    <button type="button" onclick="filterShiftStatus('scheduled')" id="filter-scheduled" class="shift-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-bold bg-stone-100 text-stone-700 hover:bg-stone-200">🔵 Scheduled</button>
+                    <button type="button" onclick="filterShiftStatus('attention')" id="filter-attention" class="shift-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-bold bg-stone-100 text-stone-700 hover:bg-stone-200">🔴 Needs Attention</button>
+                </div>
+
+                <!-- 📅 PROPER INTERACTIVE CALENDAR -->
+                <div class="bg-white border border-stone-200 rounded-3xl p-6 card-shadow space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="font-serif text-xl text-forest-900 font-bold">Shift Calendar</h3>
+                        <div class="flex items-center gap-4 text-xs">
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Worked</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span> Scheduled</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> Draft</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span> Attention</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-7 text-center font-bold text-xs text-stone-400 pb-2 border-b border-stone-100">
+                        <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+                    </div>
+                    <div id="calendar-grid" class="grid grid-cols-7 gap-2 pt-2 min-h-[380px]"></div>
+                </div>
+
+                <!-- SHIFTS LEDGER LIST -->
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between border-b border-stone-200 pb-2">
+                        <h3 class="font-serif text-xl font-bold text-forest-900">Shift Records</h3>
+                        <span id="ledger-count" class="text-xs font-mono text-stone-400">0 records</span>
+                    </div>
+                    <div id="ledger-rows" class="space-y-3"></div>
+                </div>
+            </section>
+
+            <!-- TAB 3: 💰 MONEY, PAYCHECK & PAYSLIPS -->
+            <section id="tab-content-money" class="tab-view space-y-6 hidden">
+                
+                <div class="border-b border-stone-200 pb-3">
+                    <h2 class="font-serif text-2xl text-forest-900">Paycheck Engine & Reconciliation</h2>
+                    <p class="text-xs text-stone-500">Detailed itemized salary breakdown, payslip reconciliation, and variance analysis.</p>
+                </div>
+
+                <!-- 💰 EXPECTED PAYCHECK BREAKDOWN CARD -->
+                <div class="bg-white border border-stone-200 rounded-3xl p-6 card-shadow space-y-5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-4">
+                        <div>
+                            <span class="text-[10px] font-extrabold tracking-widest text-rust-500 uppercase block">MONTHLY ESTIMATE</span>
+                            <h3 class="font-serif text-2xl font-bold text-forest-900">Expected September Paycheck</h3>
+                        </div>
+                        <div class="text-right">
+                            <span id="paycheck-net" class="font-serif text-3xl font-bold text-rust-500 block">0.00 kr</span>
+                            <span class="text-xs text-stone-400">Estimated Net Salary</span>
+                        </div>
+                    </div>
+
+                    <!-- Itemized Breakdown Table -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                        <div class="space-y-3 text-xs">
+                            <div class="flex justify-between py-1.5 border-b border-stone-100">
+                                <span class="text-stone-600">Base Wages</span>
+                                <span id="paycheck-base" class="font-bold text-forest-900">0.00 kr</span>
+                            </div>
+                            <div class="flex justify-between py-1.5 border-b border-stone-100">
+                                <span class="text-stone-600">OB (Evening / Weekend Pay)</span>
+                                <span id="paycheck-ob" class="font-bold text-forest-900">0.00 kr</span>
+                            </div>
+                            <div class="flex justify-between py-1.5 border-b border-stone-100">
+                                <span class="text-stone-600">Overtime Supplements</span>
+                                <span id="paycheck-overtime" class="font-bold text-forest-900">0.00 kr</span>
+                            </div>
+                            <div class="flex justify-between py-1.5 border-b border-stone-100">
+                                <span class="text-stone-600">Tips Logged</span>
+                                <span id="paycheck-tips" class="font-bold text-forest-900">0.00 kr</span>
+                            </div>
+                            <div class="flex justify-between py-1.5 border-b border-stone-100">
+                                <span class="text-stone-600">Other Supplements</span>
+                                <span id="paycheck-supplements" class="font-bold text-forest-900">0.00 kr</span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 text-xs bg-stone-50 border border-stone-200 p-4 rounded-2xl">
+                            <div class="flex justify-between py-1.5 border-b border-stone-200 font-bold text-sm">
+                                <span class="text-forest-900">Estimated Gross Income</span>
+                                <span id="paycheck-gross" class="text-forest-900">0.00 kr</span>
+                            </div>
+                            <div class="flex justify-between py-1.5 border-b border-stone-200 text-red-600">
+                                <span>Estimated Tax (~32%)</span>
+                                <span id="paycheck-tax">-0.00 kr</span>
+                            </div>
+                            <div class="flex justify-between py-1 border-b border-stone-200 text-stone-600">
+                                <span>Work Expenses Deducted</span>
+                                <span id="paycheck-expenses">-0.00 kr</span>
+                            </div>
+                            <div class="flex justify-between py-2 font-bold text-base text-forest-900">
+                                <span>Net Effective Earnings</span>
+                                <span id="paycheck-effective-net" class="text-rust-500">0.00 kr</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 🧾 PAYSLIP SCANNER & RECONCILIATION -->
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    
+                    <div class="lg:col-span-7 space-y-4">
+                        <div class="flex items-center justify-between border-b border-stone-200 pb-3">
+                            <h3 class="font-serif text-xl font-bold text-forest-900">Payslip History</h3>
+                            <button type="button" onclick="openPayslipModal()" class="bg-forest-900 text-cream-50 font-semibold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1">
+                                <i data-lucide="plus" class="w-4 h-4 text-rust-500"></i> Log Payslip
+                            </button>
+                        </div>
+                        <div id="payslips-list" class="space-y-3"></div>
+                    </div>
+
+                    <!-- 🔎 "WHY IS MY SALARY DIFFERENT?" VARIANCE ENGINE -->
+                    <div class="lg:col-span-5 bg-white border border-stone-200 rounded-3xl p-6 card-shadow space-y-4">
+                        <h3 class="font-serif text-lg font-bold text-forest-900 flex items-center gap-2">
+                            <i data-lucide="file-search" class="w-4 h-4 text-rust-500"></i> Salary Variance Analysis
+                        </h3>
+                        <p class="text-xs text-stone-500">Compares your calculated shift logs against official payslips to identify discrepancies.</p>
+
+                        <div id="variance-box" class="space-y-3 pt-2 text-xs">
+                            <div class="bg-stone-50 border border-stone-200 p-4 rounded-2xl space-y-2">
+                                <div class="flex justify-between font-bold text-stone-800">
+                                    <span>Calculated Gross:</span>
+                                    <span id="var-calc-gross">12,842 kr</span>
+                                </div>
+                                <div class="flex justify-between font-bold text-stone-800">
+                                    <span>Payslip Gross:</span>
+                                    <span id="var-actual-gross">12,760 kr</span>
+                                </div>
+                                <div class="flex justify-between font-bold text-red-600 border-t border-stone-200 pt-2">
+                                    <span>Discrepancy:</span>
+                                    <span id="var-diff">-82 kr</span>
+                                </div>
+                            </div>
+
+                            <div class="space-y-2">
+                                <span class="font-bold text-stone-700 block">Possible Variance Sources:</span>
+                                <div class="space-y-1.5 text-stone-600">
+                                    <div class="flex justify-between bg-stone-100 p-2 rounded-lg">
+                                        <span>✓ Base Hours Adjustment</span>
+                                        <span class="font-mono text-stone-800">-20 kr</span>
+                                    </div>
+                                    <div class="flex justify-between bg-stone-100 p-2 rounded-lg">
+                                        <span>✓ OB Evening Supplement Difference</span>
+                                        <span class="font-mono text-stone-800">-62 kr</span>
+                                    </div>
+                                    <div class="flex justify-between bg-stone-100 p-2 rounded-lg">
+                                        <span>✓ Unpaid Break Rules</span>
+                                        <span class="font-mono text-stone-800">0 kr</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: 📊 ANALYTICS & GOALS -->
+            <section id="tab-content-analytics" class="tab-view space-y-6 hidden">
+                <div class="border-b border-stone-200 pb-3">
+                    <h2 class="font-serif text-2xl text-forest-900">Analytics Center & Goal Tracking</h2>
+                    <p class="text-xs text-stone-500">Effective hourly earnings, monthly trends, and goal progression.</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <!-- Effective Hourly Rate & Monthly Trends -->
+                    <div class="lg:col-span-7 bg-white border border-stone-200 rounded-3xl p-6 card-shadow space-y-6">
+                        <div class="flex items-center justify-between border-b border-stone-100 pb-3">
+                            <div>
+                                <span class="text-[10px] font-mono text-stone-400 uppercase">REAL VALUE OF TIME</span>
+                                <h3 class="font-serif text-xl font-bold text-forest-900">Effective Hourly Income</h3>
+                            </div>
+                            <div class="text-right">
+                                <span id="analytics-effective-rate" class="font-serif text-2xl font-bold text-rust-500">146.20 kr/h</span>
+                                <span class="text-[10px] text-stone-400 block">Base wage: 153.64 kr/h</span>
+                            </div>
+                        </div>
+
+                        <!-- Monthly Hours Bar Chart -->
+                        <div class="space-y-3">
+                            <span class="text-xs font-bold text-stone-700 block">Monthly Hours Worked</span>
+                            <div id="analytics-bars" class="grid grid-cols-5 gap-3 items-end h-40 pt-4 bg-stone-50 border border-stone-200 p-4 rounded-2xl">
+                                <!-- Dynamic bars -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- "What If?" Calculator Sandbox -->
+                    <div class="lg:col-span-5 bg-white border border-stone-200 rounded-3xl p-6 card-shadow space-y-4">
+                        <h3 class="font-serif text-lg font-bold text-forest-900 flex items-center gap-2">
+                            <i data-lucide="help-circle" class="w-4 h-4 text-rust-500"></i> "What If?" Sandbox
+                        </h3>
+                        <p class="text-xs text-stone-500">Simulate extra shifts or higher wage rates to plan your income goals.</p>
+                        
+                        <div class="space-y-4 pt-2 text-xs">
+                            <div>
+                                <label class="block font-semibold text-stone-700 mb-1">Simulate Extra Shift Hours:</label>
+                                <input type="number" id="sandbox-hrs" value="15" onchange="runSandbox()" class="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                            </div>
+                            <div>
+                                <label class="block font-semibold text-stone-700 mb-1">Simulate Hourly Rate (kr/h):</label>
+                                <input type="number" id="sandbox-rate" value="165" onchange="runSandbox()" class="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                            </div>
+                            <div class="bg-forest-900 text-cream-50 p-4 rounded-2xl space-y-1">
+                                <span class="text-[10px] text-stone-400 block">Simulated Additional Net Income</span>
+                                <span id="sandbox-result" class="font-serif text-2xl font-bold text-cream-50 block">+1,683 kr</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: 🏢 EMPLOYERS & RATES -->
+            <section id="tab-content-employers" class="tab-view space-y-6 hidden">
+                <div class="flex items-center justify-between border-b border-stone-200 pb-3">
+                    <div>
+                        <span class="text-[10px] font-extrabold tracking-widest text-rust-500 uppercase block">CONFIGURATIONS</span>
+                        <h2 class="font-serif text-2xl text-forest-900">Employer Profiles & Wage Rules</h2>
+                    </div>
+                    <button type="button" onclick="openAddEmployerModal()" class="bg-forest-900 hover:bg-forest-800 text-cream-50 font-semibold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 shadow-sm transition">
+                        <i data-lucide="plus" class="w-4 h-4 text-rust-500"></i> Add Employer
+                    </button>
+                </div>
+                <div id="employers-grid" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
+            </section>
+
+            <!-- TAB 6: 📄 REPORTS & EXPORT -->
+            <section id="tab-content-reports" class="tab-view space-y-6 hidden">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-200 pb-3">
+                    <div>
+                        <h2 class="font-serif text-2xl text-forest-900">Monthly Work Reports</h2>
+                        <p class="text-xs text-stone-500">Generate professional summary reports for tax reconciliation or records.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="window.print()" class="bg-forest-900 text-cream-50 font-semibold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 shadow-sm transition">
+                            <i data-lucide="printer" class="w-4 h-4 text-rust-500"></i> Print / Save PDF
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Printable Report Card -->
+                <div id="printable-report" class="bg-white border border-stone-200 rounded-3xl p-8 card-shadow space-y-6 max-w-3xl mx-auto">
+                    <div class="flex items-center justify-between border-b border-stone-200 pb-4">
+                        <div>
+                            <span class="font-serif text-2xl font-bold text-forest-900 block">EARNEST REPORT</span>
+                            <span class="text-xs text-stone-500">Monthly Work & Income Summary</span>
+                        </div>
+                        <div class="text-right">
+                            <span id="report-month" class="font-serif text-lg font-bold text-rust-500">September 2026</span>
+                            <span id="report-profile" class="text-xs text-stone-400 block">Main Profile</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs bg-stone-50 p-4 rounded-2xl">
+                        <div>
+                            <span class="text-stone-400 block">Total Hours</span>
+                            <span id="rep-hours" class="font-serif text-base font-bold text-forest-900">86h 30m</span>
+                        </div>
+                        <div>
+                            <span class="text-stone-400 block">Total Shifts</span>
+                            <span id="rep-shifts" class="font-serif text-base font-bold text-forest-900">14</span>
+                        </div>
+                        <div>
+                            <span class="text-stone-400 block">Gross Earnings</span>
+                            <span id="rep-gross" class="font-serif text-base font-bold text-forest-900">12,842 kr</span>
+                        </div>
+                        <div>
+                            <span class="text-stone-400 block">Estimated Net</span>
+                            <span id="rep-net" class="font-serif text-base font-bold text-rust-500">9,742 kr</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <span class="text-xs font-bold text-stone-700 block">Shift Breakdown Table</span>
+                        <div id="rep-table" class="space-y-2 text-xs"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 7: ⚙️ SETTINGS, APPLE SYNC & PWA -->
+            <section id="tab-content-settings" class="tab-view space-y-6 hidden">
+                <div class="border-b border-stone-200 pb-3">
+                    <h2 class="font-serif text-2xl text-forest-900">Settings, Sync & Backup</h2>
+                    <p class="text-xs text-stone-500">Apple Calendar subscription, cross-device sync, and PWA setup.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Apple Calendar Sync Card -->
+                    <div class="bg-white border border-stone-200 rounded-3xl p-6 card-shadow space-y-4">
+                        <div class="flex items-center gap-3">
+                            <div class="p-3 rounded-2xl bg-stone-100 text-forest-900"><i data-lucide="calendar" class="w-6 h-6"></i></div>
+                            <div>
+                                <h4 class="font-bold text-sm text-forest-900">Apple Calendar iCal Sync</h4>
+                                <p class="text-xs text-stone-500">1-Tap sync so shifts appear directly in Apple Calendar</p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-3 pt-2">
+                            <button type="button" onclick="subscribeAppleCalendar()" class="bg-forest-900 text-cream-50 font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center gap-2">
+                                <i data-lucide="calendar-plus" class="w-4 h-4 text-rust-500"></i> 1-Tap Apple Sync
+                            </button>
+                            <button type="button" onclick="downloadICS()" class="bg-stone-100 hover:bg-stone-200 text-forest-900 font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center gap-2">
+                                <i data-lucide="download" class="w-4 h-4"></i> Download .ics File
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Cross Device Sync & Backup Card -->
+                    <div class="bg-white border border-stone-200 rounded-3xl p-6 card-shadow space-y-4">
+                        <div class="flex items-center gap-3">
+                            <div class="p-3 rounded-2xl bg-stone-100 text-forest-900"><i data-lucide="refresh-cw" class="w-6 h-6"></i></div>
+                            <div>
+                                <h4 class="font-bold text-sm text-forest-900">Cross-Device Sync & Backup</h4>
+                                <p class="text-xs text-stone-500">Transfer data between PC and mobile phone seamlessly</p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-3 pt-2">
+                            <button type="button" onclick="exportSyncCode()" class="bg-forest-900 text-cream-50 font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center gap-2">
+                                <i data-lucide="copy" class="w-4 h-4 text-rust-500"></i> Copy Sync Code
+                            </button>
+                            <button type="button" onclick="importSyncCode()" class="bg-stone-100 hover:bg-stone-200 text-forest-900 font-semibold py-2.5 px-4 rounded-xl text-xs flex items-center gap-2">
+                                <i data-lucide="download-cloud" class="w-4 h-4"></i> Import Sync Code
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Supabase PostgreSQL Cloud Database & Auth Card -->
+                    <div class="bg-white border border-stone-200 rounded-3xl p-6 card-shadow space-y-4 md:col-span-2">
+                        <div class="flex items-center justify-between border-b border-stone-100 pb-3">
+                            <div class="flex items-center gap-3">
+                                <div class="p-3 rounded-2xl bg-forest-900 text-cream-50"><i data-lucide="database" class="w-6 h-6 text-rust-500"></i></div>
+                                <div>
+                                    <h4 class="font-bold text-base text-forest-900">Supabase Cloud Database & Auth</h4>
+                                    <p class="text-xs text-stone-500">Permanent PostgreSQL storage with Row Level Security (RLS) protection across iPhone, iPad & PC</p>
+                                </div>
+                            </div>
+                            <span id="supa-status-badge" class="text-xs bg-stone-100 text-stone-600 font-bold px-3 py-1 rounded-full">Offline / Local Mode</span>
+                        </div>
+
+                        <!-- Supabase Config & Login Form -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                            <div class="space-y-3 bg-stone-50 border border-stone-200 p-4 rounded-2xl">
+                                <span class="font-bold text-forest-900 block">1. Supabase Project Credentials</span>
+                                <div>
+                                    <label class="block text-stone-600 mb-1">Project URL</label>
+                                    <input type="text" id="supa-url" placeholder="https://your-project.supabase.co" class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs">
+                                </div>
+                                <div>
+                                    <label class="block text-stone-600 mb-1">Anon API Key</label>
+                                    <input type="password" id="supa-key" placeholder="eyJhbGciOi..." class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs">
+                                </div>
+                                <button type="button" onclick="saveSupabaseConfig()" class="bg-forest-900 text-cream-50 font-bold px-4 py-2 rounded-xl text-xs hover:bg-forest-800">
+                                    Connect Supabase
+                                </button>
+                            </div>
+
+                            <div class="space-y-3 bg-stone-50 border border-stone-200 p-4 rounded-2xl">
+                                <span class="font-bold text-forest-900 block">2. User Account (Supabase Auth)</span>
+                                <div>
+                                    <label class="block text-stone-600 mb-1">Email</label>
+                                    <input type="email" id="supa-email" placeholder="user@example.com" class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs">
+                                </div>
+                                <div>
+                                    <label class="block text-stone-600 mb-1">Password</label>
+                                    <input type="password" id="supa-pass" placeholder="••••••••" class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs">
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" onclick="supaSignIn()" class="bg-rust-500 text-white font-bold px-4 py-2 rounded-xl text-xs hover:bg-rust-600">
+                                        Sign In
+                                    </button>
+                                    <button type="button" onclick="supaSignUp()" class="bg-stone-200 text-stone-700 font-bold px-4 py-2 rounded-xl text-xs hover:bg-stone-300">
+                                        Sign Up
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Local Data Migration Section -->
+                        <div class="border-t border-stone-100 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                                <span class="font-bold text-xs text-forest-900 block">3. Local Data Migration & Sync</span>
+                                <p class="text-xs text-stone-500">Upload all local shifts, employers, and payslips to your persistent Supabase account.</p>
+                            </div>
+                            <button type="button" onclick="migrateLocalDataToSupabase()" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 shadow-sm shrink-0">
+                                <i data-lucide="upload-cloud" class="w-4 h-4"></i> Migrate Local Data to Cloud
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="border-t border-stone-200 bg-[#FAF8F5] py-6">
+            <div class="max-w-6xl mx-auto px-4 flex items-center justify-between text-xs text-stone-400">
+                <span class="font-serif font-bold text-forest-900">Earnest System</span>
+                <span>Every hour counts.</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- MODAL 1: ADD / EDIT SHIFT (WITH SAVE & DUPLICATE) -->
+    <div id="modal-shift" class="fixed inset-0 bg-forest-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-[#FAF8F5] border border-stone-200 max-w-lg w-full rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-stone-200 pb-3">
+                <h3 id="modal-shift-title" class="font-serif text-xl text-forest-900">Log a work shift</h3>
+                <button type="button" onclick="closeModal('modal-shift')" class="text-stone-400 hover:text-stone-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <form onsubmit="saveShift(event)" class="space-y-4">
+                <input type="hidden" id="shift-edit-id">
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">Employer</label>
+                        <select id="shift-emp" onchange="onEmployerChange()" required class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">Role</label>
+                        <select id="shift-role" onchange="onRoleChange()" required class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900"></select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">Date</label>
+                        <input type="date" id="shift-date" required class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">Start Time</label>
+                        <input type="time" id="shift-start" required onchange="calcPreview()" class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">End Time</label>
+                        <input type="time" id="shift-end" required onchange="calcPreview()" class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">Status</label>
+                        <select id="shift-status" class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                            <option value="worked">🟢 Worked</option>
+                            <option value="scheduled">🔵 Scheduled</option>
+                            <option value="draft">🟡 Draft</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">Break (mins)</label>
+                        <input type="number" id="shift-break" value="30" onchange="calcPreview()" class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">Rate (kr/h)</label>
+                        <input type="number" step="0.01" id="shift-rate" onchange="calcPreview()" required class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    </div>
+                </div>
+
+                <!-- OB / Evening / Weekend / Tips / Expenses Component Breakdown -->
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">OB Extra Pay (kr)</label>
+                        <input type="number" step="0.01" id="shift-ob" value="0" onchange="calcPreview()" class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">Tips (kr)</label>
+                        <input type="number" step="0.01" id="shift-tips" value="0" onchange="calcPreview()" class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">Expenses (kr)</label>
+                        <input type="number" step="0.01" id="shift-expenses" value="0" onchange="calcPreview()" class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-stone-600 mb-1">Notes</label>
+                    <input type="text" id="shift-notes" placeholder="e.g. Evening banquet shift" class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                </div>
+
+                <div class="bg-forest-900 text-cream-50 rounded-2xl p-4 flex items-center justify-between text-xs">
+                    <div>
+                        <span class="text-stone-400 block">Paid Time</span>
+                        <span id="prev-hours" class="font-serif text-lg font-bold">0.00 hrs</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-stone-400 block">Est Gross Pay</span>
+                        <span id="prev-net" class="font-serif text-lg font-bold text-rust-500">0.00 kr</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3 pt-2">
+                    <button type="submit" class="flex-1 bg-forest-900 text-cream-50 font-semibold py-3 rounded-2xl shadow-lg hover:bg-forest-800 transition">
+                        Save Shift
+                    </button>
+                    <button type="button" onclick="saveAndDuplicateShift(event)" class="bg-rust-500 hover:bg-rust-600 text-white font-bold py-3 px-4 rounded-2xl text-xs transition">
+                        Save & Duplicate ⧉
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: ADD EMPLOYER -->
+    <div id="modal-add-employer" class="fixed inset-0 bg-forest-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-[#FAF8F5] border border-stone-200 max-w-md w-full rounded-3xl p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-stone-200 pb-3">
+                <h3 class="font-serif text-xl text-forest-900">Add New Employer Profile</h3>
+                <button type="button" onclick="closeModal('modal-add-employer')" class="text-stone-400 hover:text-stone-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <form onsubmit="saveNewEmployer(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-stone-600 mb-1">Employer Name</label>
+                    <input type="text" id="emp-new-name" placeholder="e.g. Grand Hôtel" required class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-stone-600 mb-1">Workplace Location / City</label>
+                    <input type="text" id="emp-new-location" placeholder="e.g. Stockholm Waterfront" class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">Primary Role Name</label>
+                        <input type="text" id="emp-new-role" placeholder="e.g. Event Runner" required class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">Hourly Rate (kr)</label>
+                        <input type="number" step="0.01" id="emp-new-rate" placeholder="153.64" required class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-forest-900 text-cream-50 font-semibold py-3 rounded-2xl shadow-lg">Save Employer Profile</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 3: PAYSLIP SCANNER & MANUAL LOG -->
+    <div id="modal-payslip" class="fixed inset-0 bg-forest-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-[#FAF8F5] border border-stone-200 max-w-md w-full rounded-3xl p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-stone-200 pb-3">
+                <h3 class="font-serif text-xl text-forest-900">Log & Reconcile Payslip</h3>
+                <button type="button" onclick="closeModal('modal-payslip')" class="text-stone-400 hover:text-stone-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <form onsubmit="savePayslip(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-stone-600 mb-1">Employer</label>
+                    <select id="ps-emp" required class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900"></select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">Period Start</label>
+                        <input type="date" id="ps-start" required class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">Period End</label>
+                        <input type="date" id="ps-end" required class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">Actual Gross (kr)</label>
+                        <input type="number" step="0.01" id="ps-gross" required class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-stone-600 mb-1">Actual Net (kr)</label>
+                        <input type="number" step="0.01" id="ps-net" required class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-forest-900 text-cream-50 font-semibold py-3 rounded-2xl shadow-lg">Save & Reconcile</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 4: ADMIN & PROFILE MANAGER MODAL -->
+    <div id="modal-admin" class="fixed inset-0 bg-forest-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-[#FAF8F5] border border-stone-200 max-w-xl w-full rounded-3xl p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-stone-200 pb-3">
+                <div>
+                    <h3 class="font-serif text-2xl text-forest-900 flex items-center gap-2">
+                        <i data-lucide="shield-check" class="w-6 h-6 text-rust-500"></i> Profile Manager & Admin
+                    </h3>
+                    <p class="text-xs text-stone-500">Manage profiles, change PINs, or sync accounts</p>
+                </div>
+                <button type="button" onclick="closeModal('modal-admin')" class="text-stone-400 hover:text-stone-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <!-- Profiles List in Admin Modal -->
+            <div class="space-y-3">
+                <span class="text-xs font-bold text-stone-400 uppercase tracking-wider block">Registered Profiles</span>
+                <div id="admin-profiles-list" class="space-y-2"></div>
+            </div>
+
+            <!-- Create New Profile Form inside Admin -->
+            <div class="border-t border-stone-200 pt-4 space-y-3">
+                <span class="text-xs font-bold text-forest-900 uppercase tracking-wider block">+ Create New User Profile</span>
+                <form onsubmit="adminCreateProfile(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <input type="text" id="admin-new-name" placeholder="Profile Name (e.g. John)" required class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    <input type="password" id="admin-new-pin" placeholder="4-Digit PIN (e.g. 1234)" maxlength="4" required class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-sm text-forest-900">
+                    <button type="submit" class="bg-forest-900 text-cream-50 font-bold py-2 rounded-xl text-xs hover:bg-forest-800 transition">Create Profile</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT APPLICATION CODE -->
+    <script>
+        let profiles = [];
+        let activeProfile = null;
+        let pendingPinProfile = null;
+        let enteredPin = "";
+        let currentCalDate = new Date(2026, 8, 1);
+        let activeShiftFilter = 'all';
+
+        const defaultEmployers = [
+            { id: 1, name: "Agra Tandoori", location: "Stockholm Center", default_tax_rate: 0.32, roles: [{ id: 101, role_name: "Kitchen & Server", hourly_rate: 95.0 }] },
+            { id: 2, name: "Grand Hôtel", location: "Blasieholmen, Stockholm", default_tax_rate: 0.32, roles: [{ id: 201, role_name: "Event Runner", hourly_rate: 153.64 }, { id: 202, role_name: "Banquet Captain", hourly_rate: 165.0 }] },
+            { id: 3, name: "Backup Job", location: "Stockholm", default_tax_rate: 0.30, roles: [{ id: 301, role_name: "Store Assistant", hourly_rate: 120.0 }] }
+        ];
+
+        const defaultShifts = [
+            { id: 1, employer_id: 2, employer_name: "Grand Hôtel", role_name: "Event Runner", date: "2026-09-25", start_time: "15:00", end_time: "23:30", unpaid_break_mins: 30, paid_hours: 8.0, gross_pay: 1229.12, ob_pay: 120.0, tips: 85.0, net_pay: 835.80, hourly_rate: 153.64, status: "worked", notes: "Banquet shift" },
+            { id: 2, employer_id: 2, employer_name: "Grand Hôtel", role_name: "Event Runner", date: "2026-09-28", start_time: "16:00", end_time: "23:00", unpaid_break_mins: 30, paid_hours: 6.5, gross_pay: 998.66, ob_pay: 0, tips: 0, net_pay: 679.09, hourly_rate: 153.64, status: "scheduled", notes: "Upcoming shift" }
+        ];
+
+        document.addEventListener("DOMContentLoaded", () => {
+            lucide.createIcons();
+            loadProfiles();
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js').catch(() => {});
+            }
+        });
+
+        // ---------------------------------------------------------
+        // PROFILE SYSTEM & STORAGE
+        // ---------------------------------------------------------
+        async function loadProfiles() {
+            const stored = localStorage.getItem("earnest_profiles");
+            if (stored) {
+                try { profiles = JSON.parse(stored); } catch(e) {}
+            }
+
+            try {
+                const res = await fetch("/api/profiles");
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.profiles && data.profiles.length > 0) {
+                        profiles = data.profiles;
+                        localStorage.setItem("earnest_profiles", JSON.stringify(profiles));
+                    }
+                }
+            } catch (e) {}
+
+            if (!profiles || profiles.length === 0) {
+                profiles = [
+                    { id: "p_admin", name: "Main Profile", pin: "1234", isAdmin: true, avatar: "M", employers: defaultEmployers, shifts: defaultShifts, payslips: [], goals: { hours: 100, net: 15000, shifts: 20 } }
+                ];
+                saveProfiles();
+            }
+            renderProfilesGrid();
+        }
+
+        function saveProfiles() {
+            localStorage.setItem("earnest_profiles", JSON.stringify(profiles));
+            try {
+                fetch("/api/profiles", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ profiles: profiles })
+                }).catch(() => {});
+            } catch(e) {}
+        }
+
+        function renderProfilesGrid() {
+            const grid = document.getElementById("profiles-grid");
+            grid.innerHTML = "";
+
+            profiles.forEach(p => {
+                grid.innerHTML += `
+                    <div onclick="selectProfile('${p.id}')" class="bg-white border border-stone-200 hover:border-forest-900 p-6 rounded-3xl text-center space-y-3 cursor-pointer card-shadow transition transform hover:-translate-y-1">
+                        <div class="w-14 h-14 rounded-2xl ${p.isAdmin ? 'bg-rust-500' : 'bg-forest-900'} text-cream-50 font-serif text-xl font-bold flex items-center justify-center mx-auto shadow-md">${p.avatar}</div>
+                        <div>
+                            <h4 class="font-serif font-bold text-forest-900 text-base">${p.name}</h4>
+                            <span class="text-[10px] text-stone-400 flex items-center justify-center gap-1 mt-1">
+                                <i data-lucide="lock" class="w-3 h-3"></i> ${p.isAdmin ? 'Main Admin Profile' : 'PIN Protected'}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            });
+            lucide.createIcons();
+        }
+
+        function selectProfile(id) {
+            const p = profiles.find(x => x.id === id);
+            if (!p) return;
+            if (p.pin) {
+                pendingPinProfile = p;
+                enteredPin = "";
+                document.getElementById("pin-profile-name").innerText = `PIN for ${p.name}`;
+                updatePinDots();
+                document.getElementById("modal-pin").classList.remove("hidden");
+            } else {
+                activateProfile(p);
+            }
+        }
+
+        function pressPin(digit) {
+            if (enteredPin.length < 4) {
+                enteredPin += digit;
+                updatePinDots();
+                if (enteredPin.length === 4) verifyPin();
+            }
+        }
+        function clearPin() { enteredPin = ""; updatePinDots(); }
+        function backspacePin() { enteredPin = enteredPin.slice(0, -1); updatePinDots(); }
+        function updatePinDots() {
+            for (let i = 1; i <= 4; i++) {
+                const dot = document.getElementById(`pin-dot-${i}`);
+                if (i <= enteredPin.length) dot.classList.add("bg-forest-900");
+                else dot.classList.remove("bg-forest-900");
+            }
+        }
+        function verifyPin() {
+            if (pendingPinProfile && enteredPin === pendingPinProfile.pin) {
+                closeModal("modal-pin");
+                activateProfile(pendingPinProfile);
+            } else {
+                alert("Incorrect PIN code");
+                clearPin();
+            }
+        }
+
+        function activateProfile(p) {
+            activeProfile = p;
+            document.getElementById("screen-profiles").classList.add("hidden");
+            document.getElementById("app-main").classList.remove("hidden");
+
+            document.getElementById("header-avatar").innerText = p.avatar;
+            document.getElementById("header-profile-name").innerText = p.name;
+
+            renderDashboard();
+            loadEmployers();
+            renderLedger();
+            renderCalendar();
+            loadPayslips();
+        }
+
+        function showProfileScreen() {
+            document.getElementById("app-main").classList.add("hidden");
+            document.getElementById("screen-profiles").classList.remove("hidden");
+            renderProfilesGrid();
+        }
+
+        // ---------------------------------------------------------
+        // NAVIGATION TAB CONTROLLER
+        // ---------------------------------------------------------
+        function switchTab(tabId) {
+            document.querySelectorAll(".tab-view").forEach(el => el.classList.add("hidden"));
+            const target = document.getElementById(`tab-content-${tabId}`);
+            if (target) target.classList.remove("hidden");
+
+            document.querySelectorAll(".nav-btn").forEach(el => {
+                el.classList.remove("bg-forest-900", "text-cream-50");
+                el.classList.add("text-stone-600");
+            });
+
+            const activeBtn = document.getElementById(`nav-${tabId}`);
+            if (activeBtn) {
+                activeBtn.classList.remove("text-stone-600");
+                activeBtn.classList.add("bg-forest-900", "text-cream-50");
+            }
+
+            if (tabId === 'dashboard') renderDashboard();
+            if (tabId === 'work') { renderLedger(); renderCalendar(); }
+            if (tabId === 'money') { renderPaycheckBreakdown(); loadPayslips(); }
+            if (tabId === 'analytics') renderAnalytics();
+            if (tabId === 'reports') renderReportView();
+        }
+
+        // ---------------------------------------------------------
+        // 1. DASHBOARD & INSIGHTS ENGINE
+        // ---------------------------------------------------------
+        function renderDashboard() {
+            if (!activeProfile) return;
+            const shifts = activeProfile.shifts || [];
+
+            let totalGross = 0, totalNet = 0, totalHours = 0, totalTips = 0, totalExpenses = 0;
+            let workedShiftsCount = 0;
+
+            shifts.forEach(s => {
+                totalGross += s.gross_pay || 0;
+                totalNet += s.net_pay || 0;
+                totalHours += s.paid_hours || 0;
+                totalTips += s.tips || 0;
+                totalExpenses += s.expenses || 0;
+                if (s.status === 'worked' || !s.status) workedShiftsCount++;
+            });
+
+            const effectiveRate = totalHours > 0 ? Math.round((totalNet / totalHours) * 100) / 100 : 0;
+
+            document.getElementById("dash-gross").innerText = `${totalGross.toLocaleString('en-US', {minimumFractionDigits:2})} kr`;
+            document.getElementById("dash-net").innerText = `${totalNet.toLocaleString('en-US', {minimumFractionDigits:2})} kr`;
+            document.getElementById("dash-hours").innerText = `${Math.floor(totalHours)}h ${Math.round((totalHours%1)*60)}m`;
+            document.getElementById("dash-shifts-count").innerText = `${workedShiftsCount} shift${workedShiftsCount===1?'':'s'} logged`;
+            document.getElementById("dash-tips").innerText = `${totalTips.toLocaleString()} kr`;
+            document.getElementById("dash-expenses").innerText = `${totalExpenses.toLocaleString()} kr`;
+            document.getElementById("dash-effective-rate").innerText = `${effectiveRate} kr/h`;
+
+            // Upcoming shift card
+            const scheduled = shifts.filter(s => s.status === 'scheduled');
+            const upCard = document.getElementById("upcoming-shift-card");
+            if (scheduled.length > 0) {
+                const s = scheduled[0];
+                document.getElementById("upcoming-shift-content").innerHTML = `
+                    <div>
+                        <h3 class="font-serif text-xl font-bold text-forest-900">${s.employer_name}</h3>
+                        <p class="text-xs text-stone-500 mt-0.5">${s.date} · ${s.start_time}–${s.end_time} (${s.paid_hours}h) · ${s.role_name}</p>
+                    </div>
+                    <button type="button" onclick="markShiftWorked(${s.id})" class="bg-rust-500 hover:bg-rust-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md transition">
+                        Mark as Worked ✓
+                    </button>
+                `;
+                upCard.classList.remove("hidden");
+            } else {
+                upCard.classList.add("hidden");
+            }
+
+            // Earnest Insights narrative generator
+            const insightsText = `You worked <strong>${totalHours.toFixed(1)}h</strong> across <strong>${workedShiftsCount} shifts</strong> in September. Your average shift duration was <strong>${(totalHours / (workedShiftsCount || 1)).toFixed(1)}h</strong>. Tips accounted for <strong>${totalTips.toLocaleString()} kr</strong> of your recorded income. Your effective hourly net wage is <strong>${effectiveRate} kr/h</strong>.`;
+            document.getElementById("insight-text").innerHTML = insightsText;
+
+            // Attention Flags
+            const attentionContainer = document.getElementById("attention-list");
+            attentionContainer.innerHTML = "";
+            let flags = 0;
+            shifts.forEach(s => {
+                if (s.employer_name === "Grand Hôtel" && (!s.tips || s.tips === 0)) {
+                    attentionContainer.innerHTML += `<div class="bg-amber-50 text-amber-800 p-2.5 rounded-xl flex items-center justify-between font-medium"><span>⚠️ Shift on ${s.date} at Grand Hôtel has no logged tips.</span><button onclick="editShift(${s.id})" class="underline font-bold text-amber-900">Add Tips</button></div>`;
+                    flags++;
+                }
+            });
+            if (flags === 0) {
+                attentionContainer.innerHTML = `<div class="bg-emerald-50 text-emerald-800 p-2.5 rounded-xl font-medium">✓ All shifts are reconciled and up to date!</div>`;
+            }
+
+            // Target goals progress
+            const goals = activeProfile.goals || { hours: 100, net: 15000, shifts: 20 };
+            const hrsPct = Math.min(100, Math.round((totalHours / goals.hours) * 100));
+            const netPct = Math.min(100, Math.round((totalNet / goals.net) * 100));
+            const shiftsPct = Math.min(100, Math.round((workedShiftsCount / goals.shifts) * 100));
+
+            document.getElementById("goal-hours-text").innerText = `${totalHours.toFixed(1)} / ${goals.hours} hrs (${hrsPct}%)`;
+            document.getElementById("goal-hours-bar").style.width = `${hrsPct}%`;
+
+            document.getElementById("goal-net-text").innerText = `${totalNet.toLocaleString()} / ${goals.net.toLocaleString()} kr (${netPct}%)`;
+            document.getElementById("goal-net-bar").style.width = `${netPct}%`;
+
+            document.getElementById("goal-shifts-text").innerText = `${workedShiftsCount} / ${goals.shifts} shifts (${shiftsPct}%)`;
+            document.getElementById("goal-shifts-bar").style.width = `${shiftsPct}%`;
+
+            calcWhatIf();
+        }
+
+        function markNextShiftWorked() {
+            const scheduled = (activeProfile.shifts || []).find(s => s.status === 'scheduled');
+            if (scheduled) markShiftWorked(scheduled.id);
+        }
+
+        function markShiftWorked(id) {
+            const s = activeProfile.shifts.find(x => x.id === id);
+            if (s) {
+                s.status = 'worked';
+                saveProfiles();
+                renderDashboard();
+                alert(`Shift at ${s.employer_name} marked as Worked!`);
+            }
+        }
+
+        function calcWhatIf() {
+            const extraHrs = parseFloat(document.getElementById("whatif-hrs").value || 0);
+            const rate = parseFloat(document.getElementById("whatif-rate").value || 153.64);
+            document.getElementById("whatif-hrs-val").innerText = `${extraHrs} hrs`;
+            document.getElementById("whatif-rate-val").innerText = `${rate} kr/h`;
+
+            const extraGross = extraHrs * rate;
+            const extraNet = Math.round(extraGross * 0.68 * 100) / 100;
+
+            let curNet = 0;
+            (activeProfile.shifts || []).forEach(s => curNet += (s.net_pay || 0));
+
+            document.getElementById("whatif-extra-net").innerText = `+${extraNet.toLocaleString('en-US', {minimumFractionDigits:2})} kr`;
+            document.getElementById("whatif-proj-net").innerText = `${(curNet + extraNet).toLocaleString('en-US', {minimumFractionDigits:2})} kr`;
+        }
+
+        // ---------------------------------------------------------
+        // 2. SHIFT LOGGER & SAVE AND DUPLICATE
+        // ---------------------------------------------------------
+        function openShiftModal(defaultStatus = 'worked') {
+            document.getElementById("shift-edit-id").value = "";
+            document.getElementById("modal-shift-title").innerText = "Log a work shift";
+            document.getElementById("shift-date").valueAsDate = new Date();
+            document.getElementById("shift-start").value = "15:00";
+            document.getElementById("shift-end").value = "23:00";
+            document.getElementById("shift-break").value = "30";
+            document.getElementById("shift-status").value = defaultStatus;
+            document.getElementById("shift-ob").value = "0";
+            document.getElementById("shift-tips").value = "0";
+            document.getElementById("shift-expenses").value = "0";
+            document.getElementById("shift-notes").value = "";
+
+            loadEmployersOptions();
+            document.getElementById("modal-shift").classList.remove("hidden");
+            calcPreview();
+        }
+
+        function loadEmployersOptions() {
+            const select = document.getElementById("shift-emp");
+            select.innerHTML = "";
+            (activeProfile.employers || []).forEach(e => {
+                select.innerHTML += `<option value="${e.id}">${e.name}</option>`;
+            });
+            onEmployerChange();
+        }
+
+        function onEmployerChange() {
+            const empId = parseInt(document.getElementById("shift-emp").value);
+            const emp = (activeProfile.employers || []).find(e => e.id === empId);
+            const roleSelect = document.getElementById("shift-role");
+            roleSelect.innerHTML = "";
+
+            if (emp && emp.roles) {
+                emp.roles.forEach(r => {
+                    roleSelect.innerHTML += `<option value="${r.id}" data-rate="${r.hourly_rate}">${r.role_name} (${r.hourly_rate} kr/h)</option>`;
+                });
+            } else {
+                roleSelect.innerHTML = `<option value="0" data-rate="100">General (100 kr/h)</option>`;
+            }
+            onRoleChange();
+        }
+
+        function onRoleChange() {
+            const roleSelect = document.getElementById("shift-role");
+            if (!roleSelect || roleSelect.selectedIndex < 0) return;
+            const selectedOpt = roleSelect.options[roleSelect.selectedIndex];
+            if (selectedOpt && selectedOpt.dataset.rate) {
+                document.getElementById("shift-rate").value = selectedOpt.dataset.rate;
+            }
+            calcPreview();
+        }
+
+        function calcPreview() {
+            const sTime = document.getElementById("shift-start").value;
+            const eTime = document.getElementById("shift-end").value;
+            const breakM = parseInt(document.getElementById("shift-break").value || 0);
+            const rate = parseFloat(document.getElementById("shift-rate").value || 0);
+            const ob = parseFloat(document.getElementById("shift-ob").value || 0);
+            const tips = parseFloat(document.getElementById("shift-tips").value || 0);
+
+            if (!sTime || !eTime) return;
+            const [sH, sM] = sTime.split(':').map(Number);
+            const [eH, eM] = eTime.split(':').map(Number);
+            let startMins = sH * 60 + sM, endMins = eH * 60 + eM;
+            if (endMins <= startMins) endMins += 24 * 60;
+
+            let paidMins = Math.max(0, (endMins - startMins) - breakM);
+            let paidHours = Math.round((paidMins / 60) * 100) / 100;
+            let gross = Math.round(((paidHours * rate) + ob + tips) * 100) / 100;
+
+            document.getElementById("prev-hours").innerText = `${paidHours} hrs`;
+            document.getElementById("prev-net").innerText = `${gross.toLocaleString('en-US', {minimumFractionDigits:2})} kr`;
+        }
+
+        function saveShift(e) {
+            e.preventDefault();
+            commitShiftSave();
+            closeModal("modal-shift");
+            renderDashboard();
+            renderLedger();
+            renderCalendar();
+        }
+
+        function saveAndDuplicateShift(e) {
+            e.preventDefault();
+            commitShiftSave();
+            alert("Shift saved! Opening duplicate pre-filled shift modal...");
+            document.getElementById("shift-edit-id").value = "";
+            document.getElementById("modal-shift-title").innerText = "Duplicate Pre-filled Shift";
+            calcPreview();
+        }
+
+        function commitShiftSave() {
+            if (!activeProfile) return;
+            const empId = parseInt(document.getElementById("shift-emp").value);
+            const emp = activeProfile.employers.find(e => e.id === empId);
+            const roleSelect = document.getElementById("shift-role");
+            const roleName = roleSelect.options[roleSelect.selectedIndex] ? roleSelect.options[roleSelect.selectedIndex].text.split(" (")[0] : "General";
+
+            const sTime = document.getElementById("shift-start").value;
+            const eTime = document.getElementById("shift-end").value;
+            const breakM = parseInt(document.getElementById("shift-break").value || 0);
+            const rate = parseFloat(document.getElementById("shift-rate").value || 0);
+            const ob = parseFloat(document.getElementById("shift-ob").value || 0);
+            const tips = parseFloat(document.getElementById("shift-tips").value || 0);
+            const expenses = parseFloat(document.getElementById("shift-expenses").value || 0);
+            const status = document.getElementById("shift-status").value;
+
+            const [sH, sM] = sTime.split(':').map(Number);
+            const [eH, eM] = eTime.split(':').map(Number);
+            let startMins = sH * 60 + sM, endMins = eH * 60 + eM;
+            if (endMins <= startMins) endMins += 24 * 60;
+
+            let paidMins = Math.max(0, (endMins - startMins) - breakM);
+            let paidHours = Math.round((paidMins / 60) * 100) / 100;
+            let gross = Math.round(((paidHours * rate) + ob + tips) * 100) / 100;
+            let net = Math.round((gross * 0.68) * 100) / 100;
+
+            const editId = document.getElementById("shift-edit-id").value;
+            const newShift = {
+                id: editId ? parseInt(editId) : Date.now(),
+                employer_id: empId,
+                employer_name: emp ? emp.name : "Employer",
+                role_name: roleName,
+                date: document.getElementById("shift-date").value,
+                start_time: sTime,
+                end_time: eTime,
+                unpaid_break_mins: breakM,
+                paid_hours: paidHours,
+                gross_pay: gross,
+                ob_pay: ob,
+                tips: tips,
+                expenses: expenses,
+                net_pay: net,
+                hourly_rate: rate,
+                status: status,
+                notes: document.getElementById("shift-notes").value || `Shift · ${sTime}–${eTime}`
+            };
+
+            if (!activeProfile.shifts) activeProfile.shifts = [];
+            if (editId) {
+                activeProfile.shifts = activeProfile.shifts.map(s => s.id === newShift.id ? newShift : s);
+            } else {
+                activeProfile.shifts.unshift(newShift);
+            }
+            saveProfiles();
+        }
+
+        function filterShiftStatus(status) {
+            activeShiftFilter = status;
+            document.querySelectorAll(".shift-filter-btn").forEach(btn => {
+                btn.classList.remove("bg-forest-900", "text-cream-50");
+                btn.classList.add("bg-stone-100", "text-stone-700");
+            });
+            const activeBtn = document.getElementById(`filter-${status}`);
+            if (activeBtn) {
+                activeBtn.classList.remove("bg-stone-100", "text-stone-700");
+                activeBtn.classList.add("bg-forest-900", "text-cream-50");
+            }
+            renderLedger();
+        }
+
+        function renderLedger() {
+            if (!activeProfile) return;
+            let shifts = activeProfile.shifts || [];
+            if (activeShiftFilter !== 'all') {
+                shifts = shifts.filter(s => s.status === activeShiftFilter);
+            }
+
+            const container = document.getElementById("ledger-rows");
+            container.innerHTML = "";
+
+            shifts.forEach(s => {
+                const statusBadge = s.status === 'scheduled' ? '<span class="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">🔵 Scheduled</span>' : '<span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">🟢 Worked</span>';
+
+                container.innerHTML += `
+                    <div class="bg-white border border-stone-200 rounded-2xl p-4 flex items-center justify-between card-shadow hover:border-forest-900/40 transition">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-xl bg-stone-100 border border-stone-200 flex flex-col items-center justify-center shrink-0">
+                                <span class="text-[9px] font-bold text-rust-500 uppercase">SEP</span>
+                                <span class="font-serif text-sm font-bold text-forest-900">${s.date.split('-')[2]}</span>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h4 class="font-serif font-bold text-base text-forest-900">${s.employer_name}</h4>
+                                    ${statusBadge}
+                                </div>
+                                <span class="text-xs text-stone-500 block">${s.role_name} · ${s.start_time}–${s.end_time} (${s.paid_hours}h)</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-4">
+                            <div class="text-right">
+                                <span class="text-[10px] text-stone-400 block font-mono">${s.hourly_rate} kr/h</span>
+                                <span class="font-serif text-lg font-bold text-forest-900">${(s.net_pay || 0).toLocaleString('en-US', {minimumFractionDigits:2})} kr</span>
+                            </div>
+                            <button type="button" onclick="deleteShift(${s.id})" title="Delete Shift" class="text-stone-300 hover:text-red-500 p-1">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById("ledger-count").innerText = `${shifts.length} record${shifts.length===1?'':'s'}`;
+            lucide.createIcons();
+        }
+
+        function deleteShift(id) {
+            if (!confirm("Delete this shift record?")) return;
+            activeProfile.shifts = activeProfile.shifts.filter(s => s.id !== id);
+            saveProfiles();
+            renderDashboard();
+            renderLedger();
+            renderCalendar();
+        }
+
+        // ---------------------------------------------------------
+        // 3. CALENDAR VIEW ENGINE
+        // ---------------------------------------------------------
+        function renderCalendar() {
+            const grid = document.getElementById("calendar-grid");
+            if (!grid) return;
+            grid.innerHTML = "";
+
+            const year = currentCalDate.getFullYear(), month = currentCalDate.getMonth();
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const offset = (firstDay + 6) % 7;
+
+            for (let i = 0; i < offset; i++) grid.innerHTML += `<div class="bg-stone-50/50 rounded-2xl p-2 min-h-[60px]"></div>`;
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${year}-${String(month+1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const shiftOnDay = (activeProfile && activeProfile.shifts) ? activeProfile.shifts.find(s => s.date === dateStr) : null;
+                
+                let dotClass = '';
+                if (shiftOnDay) {
+                    dotClass = shiftOnDay.status === 'scheduled' ? 'bg-blue-500' : 'bg-emerald-500';
+                }
+
+                const shiftContent = shiftOnDay ? `
+                    <div class="mt-1">
+                        <span class="w-2 h-2 rounded-full ${dotClass} inline-block"></span>
+                        <span class="text-[9px] font-bold text-forest-900 block truncate">${shiftOnDay.employer_name}</span>
+                        <span class="text-[8px] text-stone-400 font-mono">${shiftOnDay.paid_hours}h</span>
+                    </div>
+                ` : '';
+
+                grid.innerHTML += `
+                    <div onclick="quickAddDate('${dateStr}')" class="bg-white border border-stone-200 hover:border-forest-900 rounded-2xl p-2 min-h-[60px] cursor-pointer flex flex-col justify-between transition card-shadow">
+                        <span class="text-xs font-bold text-forest-900">${d}</span>
+                        ${shiftContent}
+                    </div>
+                `;
+            }
+        }
+
+        function changeMonth(delta) {
+            currentCalDate.setMonth(currentCalDate.getMonth() + delta);
+            const mNames = ["JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"];
+            document.getElementById("header-month-title").innerText = `${mNames[currentCalDate.getMonth()]} ${currentCalDate.getFullYear()}`;
+            renderCalendar();
+        }
+
+        function quickAddDate(dateStr) {
+            document.getElementById("shift-date").value = dateStr;
+            openShiftModal();
+        }
+
+        // ---------------------------------------------------------
+        // 4. PAYCHECK & PAYSLIP RECONCILIATION
+        // ---------------------------------------------------------
+        function renderPaycheckBreakdown() {
+            if (!activeProfile) return;
+            const shifts = activeProfile.shifts || [];
+
+            let basePay = 0, obPay = 0, overtimePay = 0, tips = 0, expenses = 0, gross = 0;
+            shifts.forEach(s => {
+                const b = (s.paid_hours * s.hourly_rate) || 0;
+                basePay += b;
+                obPay += (s.ob_pay || 0);
+                tips += (s.tips || 0);
+                expenses += (s.expenses || 0);
+                gross += (s.gross_pay || 0);
+            });
+
+            const tax = Math.round(gross * 0.32 * 100) / 100;
+            const net = Math.round((gross - tax) * 100) / 100;
+            const effectiveNet = Math.round((net - expenses) * 100) / 100;
+
+            document.getElementById("paycheck-base").innerText = `${basePay.toLocaleString('en-US', {minimumFractionDigits:2})} kr`;
+            document.getElementById("paycheck-ob").innerText = `${obPay.toLocaleString('en-US', {minimumFractionDigits:2})} kr`;
+            document.getElementById("paycheck-tips").innerText = `${tips.toLocaleString('en-US', {minimumFractionDigits:2})} kr`;
+            document.getElementById("paycheck-gross").innerText = `${gross.toLocaleString('en-US', {minimumFractionDigits:2})} kr`;
+            document.getElementById("paycheck-tax").innerText = `-${tax.toLocaleString('en-US', {minimumFractionDigits:2})} kr`;
+            document.getElementById("paycheck-expenses").innerText = `-${expenses.toLocaleString('en-US', {minimumFractionDigits:2})} kr`;
+            document.getElementById("paycheck-net").innerText = `${net.toLocaleString('en-US', {minimumFractionDigits:2})} kr`;
+            document.getElementById("paycheck-effective-net").innerText = `${effectiveNet.toLocaleString('en-US', {minimumFractionDigits:2})} kr`;
+
+            document.getElementById("var-calc-gross").innerText = `${gross.toLocaleString()} kr`;
+        }
+
+        function loadPayslips() {
+            if (!activeProfile) return;
+            const container = document.getElementById("payslips-list");
+            if (!container) return;
+            container.innerHTML = "";
+            (activeProfile.payslips || []).forEach(p => {
+                container.innerHTML += `
+                    <div class="bg-white border border-stone-200 rounded-2xl p-4 flex items-center justify-between card-shadow">
+                        <div>
+                            <span class="font-serif font-bold text-forest-900 text-base block">${p.employer_name}</span>
+                            <span class="text-xs text-stone-500">Period: ${p.pay_period_start} to ${p.pay_period_end}</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="font-serif font-bold text-forest-900 text-base block">${p.actual_net.toLocaleString()} kr</span>
+                            <span class="text-xs text-stone-400">Gross: ${p.actual_gross.toLocaleString()} kr</span>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function openPayslipModal() {
+            const select = document.getElementById("ps-emp");
+            select.innerHTML = "";
+            (activeProfile.employers || []).forEach(e => select.innerHTML += `<option value="${e.id}">${e.name}</option>`);
+            document.getElementById("modal-payslip").classList.remove("hidden");
+        }
+
+        function savePayslip(e) {
+            e.preventDefault();
+            if (!activeProfile) return;
+            const empId = parseInt(document.getElementById("ps-emp").value);
+            const emp = activeProfile.employers.find(e => e.id === empId);
+
+            const newPs = {
+                id: Date.now(),
+                employer_name: emp ? emp.name : "Employer",
+                pay_period_start: document.getElementById("ps-start").value,
+                pay_period_end: document.getElementById("ps-end").value,
+                actual_gross: parseFloat(document.getElementById("ps-gross").value),
+                actual_net: parseFloat(document.getElementById("ps-net").value)
+            };
+
+            if (!activeProfile.payslips) activeProfile.payslips = [];
+            activeProfile.payslips.unshift(newPs);
+            saveProfiles();
+            closeModal("modal-payslip");
+            loadPayslips();
+            alert("Payslip logged & reconciled!");
+        }
+
+        // ---------------------------------------------------------
+        // 5. EMPLOYER MANAGEMENT & RATES
+        // ---------------------------------------------------------
+        function loadEmployers() {
+            if (!activeProfile) return;
+            const grid = document.getElementById("employers-grid");
+            if (!grid) return;
+            grid.innerHTML = "";
+
+            (activeProfile.employers || []).forEach(e => {
+                let rolesHtml = "";
+                (e.roles || []).forEach(r => {
+                    rolesHtml += `
+                        <div class="flex items-center justify-between text-xs py-1.5 border-b border-stone-100">
+                            <span class="font-medium text-forest-900">${r.role_name}</span>
+                            <span class="font-bold text-rust-500 font-mono">${r.hourly_rate} kr/h</span>
+                        </div>
+                    `;
+                });
+
+                grid.innerHTML += `
+                    <div class="bg-white border border-stone-200 rounded-3xl p-6 card-shadow space-y-4">
+                        <div class="flex items-center justify-between border-b border-stone-100 pb-3">
+                            <div>
+                                <h3 class="font-serif text-lg font-bold text-forest-900">${e.name}</h3>
+                                <span class="text-xs text-stone-400 block">${e.location || 'Stockholm'}</span>
+                            </div>
+                            <span class="text-[10px] bg-stone-100 text-stone-600 font-bold px-2.5 py-1 rounded-full">32% Tax</span>
+                        </div>
+                        <div class="space-y-2">
+                            <span class="text-[10px] font-bold text-stone-400 uppercase tracking-wider block">Configured Roles</span>
+                            ${rolesHtml}
+                        </div>
+                    </div>
+                `;
+            });
+            lucide.createIcons();
+        }
+
+        function openAddEmployerModal() {
+            document.getElementById("modal-add-employer").classList.remove("hidden");
+        }
+
+        function saveNewEmployer(e) {
+            e.preventDefault();
+            if (!activeProfile) return;
+
+            const name = document.getElementById("emp-new-name").value.trim();
+            const location = document.getElementById("emp-new-location").value.trim() || "Stockholm";
+            const roleName = document.getElementById("emp-new-role").value.trim() || "General Shift";
+            const rate = parseFloat(document.getElementById("emp-new-rate").value) || 150;
+
+            const empId = Date.now();
+            const newEmp = {
+                id: empId,
+                name: name,
+                location: location,
+                default_tax_rate: 0.32,
+                roles: [{ id: empId + 1, role_name: roleName, hourly_rate: rate }]
+            };
+
+            if (!activeProfile.employers) activeProfile.employers = [];
+            activeProfile.employers.push(newEmp);
+            saveProfiles();
+            closeModal("modal-add-employer");
+            loadEmployers();
+            alert(`Employer '${name}' saved!`);
+        }
+
+        // ---------------------------------------------------------
+        // 6. ANALYTICS & REPORTS
+        // ---------------------------------------------------------
+        function renderAnalytics() {
+            if (!activeProfile) return;
+            const container = document.getElementById("analytics-bars");
+            if (!container) return;
+            container.innerHTML = "";
+
+            const months = [
+                { name: "MAY", hours: 62, net: 8200 },
+                { name: "JUN", hours: 78, net: 10400 },
+                { name: "JUL", hours: 91, net: 12300 },
+                { name: "AUG", hours: 72, net: 9800 },
+                { name: "SEP", hours: 86.5, net: 12842 }
+            ];
+
+            months.forEach(m => {
+                const hPct = Math.min(100, Math.round((m.hours / 100) * 100));
+                container.innerHTML += `
+                    <div class="flex flex-col items-center gap-1 h-full justify-end">
+                        <span class="text-[9px] font-bold text-forest-900">${m.hours}h</span>
+                        <div class="w-full bg-forest-900 rounded-t-lg transition-all" style="height: ${hPct}%;"></div>
+                        <span class="text-[9px] text-stone-400 font-mono mt-1">${m.name}</span>
+                    </div>
+                `;
+            });
+            runSandbox();
+        }
+
+        function runSandbox() {
+            const extraH = parseFloat(document.getElementById("sandbox-hrs").value || 0);
+            const rate = parseFloat(document.getElementById("sandbox-rate").value || 150);
+            const extraNet = Math.round(extraH * rate * 0.68);
+            document.getElementById("sandbox-result").innerText = `+${extraNet.toLocaleString()} kr`;
+        }
+
+        function renderReportView() {
+            if (!activeProfile) return;
+            const shifts = activeProfile.shifts || [];
+            let totalH = 0, totalG = 0, totalN = 0;
+
+            const table = document.getElementById("rep-table");
+            table.innerHTML = "";
+
+            shifts.forEach(s => {
+                totalH += s.paid_hours || 0;
+                totalG += s.gross_pay || 0;
+                totalN += s.net_pay || 0;
+
+                table.innerHTML += `
+                    <div class="flex items-center justify-between border-b border-stone-100 py-1.5">
+                        <span>${s.date} · ${s.employer_name} (${s.role_name})</span>
+                        <span class="font-mono font-bold">${s.paid_hours}h | ${(s.net_pay||0).toLocaleString()} kr</span>
+                    </div>
+                `;
+            });
+
+            document.getElementById("rep-hours").innerText = `${totalH.toFixed(1)}h`;
+            document.getElementById("rep-shifts").innerText = shifts.length;
+            document.getElementById("rep-gross").innerText = `${totalG.toLocaleString()} kr`;
+            document.getElementById("rep-net").innerText = `${totalN.toLocaleString()} kr`;
+        }
+
+        // ---------------------------------------------------------
+        // 7. ADMIN & DEVICE SYNC HELPERS
+        // ---------------------------------------------------------
+        function openAdminModal() {
+            renderAdminProfilesList();
+            document.getElementById("modal-admin").classList.remove("hidden");
+        }
+
+        function renderAdminProfilesList() {
+            const list = document.getElementById("admin-profiles-list");
+            list.innerHTML = "";
+            profiles.forEach(p => {
+                list.innerHTML += `
+                    <div class="bg-white border border-stone-200 rounded-2xl p-4 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-forest-900 text-white font-bold flex items-center justify-center text-xs">${p.avatar}</div>
+                            <div>
+                                <h4 class="font-bold text-sm text-forest-900">${p.name} ${p.isAdmin ? '<span class="text-[10px] bg-rust-500 text-white px-1.5 py-0.5 rounded-md">ADMIN</span>' : ''}</h4>
+                                <span class="text-xs text-stone-400">${p.shifts ? p.shifts.length : 0} shifts logged</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="adminChangePin('${p.id}')" class="text-xs font-semibold text-stone-600 hover:text-forest-900 bg-stone-100 px-3 py-1.5 rounded-lg">Change PIN</button>
+                        </div>
+                    </div>
+                `;
+            });
+            lucide.createIcons();
+        }
+
+        function adminCreateProfile(e) {
+            e.preventDefault();
+            const name = document.getElementById("admin-new-name").value.trim();
+            const pin = document.getElementById("admin-new-pin").value.trim();
+
+            if (!name || !pin || pin.length !== 4) {
+                alert("Please enter a valid profile name and 4-digit PIN.");
+                return;
+            }
+
+            const newP = {
+                id: "p_" + Date.now(),
+                name: name,
+                pin: pin,
+                isAdmin: false,
+                avatar: name.charAt(0).toUpperCase(),
+                employers: defaultEmployers,
+                shifts: [],
+                payslips: []
+            };
+
+            profiles.push(newP);
+            saveProfiles();
+            renderAdminProfilesList();
+            renderProfilesGrid();
+            alert(`Profile '${name}' created!`);
+        }
+
+        function exportSyncCode() {
+            const dataStr = JSON.stringify(profiles);
+            const encoded = btoa(encodeURIComponent(dataStr));
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(encoded).then(() => alert("Device Sync Code copied to clipboard!"));
+            } else {
+                prompt("Copy Device Sync Code:", encoded);
+            }
+        }
+
+        function importSyncCode() {
+            const input = prompt("Paste Device Sync Code here:");
+            if (!input) return;
+            try {
+                const decoded = decodeURIComponent(atob(input.trim()));
+                profiles = JSON.parse(decoded);
+                saveProfiles();
+                renderProfilesGrid();
+                alert("Device sync completed successfully!");
+            } catch (err) {
+                alert("Failed to parse Sync Code.");
+            }
+        }
+
+        function subscribeAppleCalendar() {
+            const icsData = buildICSContent();
+            window.location.href = 'data:text/calendar;charset=utf8,' + encodeURIComponent(icsData);
+        }
+
+        function downloadICS() {
+            const icsData = buildICSContent();
+            const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'earnest_shifts.ics';
+            a.click();
+        }
+
+        function buildICSContent() {
+            let shiftsToExport = (activeProfile && activeProfile.shifts) ? activeProfile.shifts : [];
+            let lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Earnest System//EN", "CALSCALE:GREGORIAN", "X-WR-CALNAME:Earnest Work Shifts"];
+            shiftsToExport.forEach(s => {
+                const dtStart = (s.date||'2026-09-25').replace(/-/g, '') + 'T' + (s.start_time||'09:00').replace(':', '') + '00';
+                const dtEnd = (s.date||'2026-09-25').replace(/-/g, '') + 'T' + (s.end_time||'17:00').replace(':', '') + '00';
+                lines.push("BEGIN:VEVENT", `UID:shift-${s.id}@earnest.app`, `DTSTART:${dtStart}`, `DTEND:${dtEnd}`, `SUMMARY:Work @ ${s.employer_name}`, `DESCRIPTION:Paid Hours: ${s.paid_hours}h | Net: ${s.net_pay} kr`, "END:VEVENT");
+            });
+            lines.push("END:VCALENDAR");
+            return lines.join("\r\n");
+        }
+
+        function closeModal(id) {
+            const elem = document.getElementById(id);
+            if (elem) elem.classList.add("hidden");
+        }
+
+        // ---------------------------------------------------------
+        // 8. SUPABASE POSTGRESQL & AUTH CLIENT ENGINE
+        // ---------------------------------------------------------
+        let supabaseClient = null;
+
+        function initSupabase() {
+            const url = localStorage.getItem("earnest_supa_url") || "";
+            const key = localStorage.getItem("earnest_supa_key") || "";
+
+            if (url && document.getElementById("supa-url")) document.getElementById("supa-url").value = url;
+            if (key && document.getElementById("supa-key")) document.getElementById("supa-key").value = key;
+
+            if (url && key && window.supabase) {
+                try {
+                    supabaseClient = window.supabase.createClient(url, key);
+                    checkSupabaseUser();
+                } catch (e) {
+                    console.error("Supabase init error:", e);
+                }
+            }
+        }
+
+        function saveSupabaseConfig() {
+            const url = document.getElementById("supa-url").value.trim();
+            const key = document.getElementById("supa-key").value.trim();
+
+            if (!url || !key) {
+                alert("Please enter both your Supabase Project URL and Anon API Key.");
+                return;
+            }
+
+            localStorage.setItem("earnest_supa_url", url);
+            localStorage.setItem("earnest_supa_key", key);
+
+            if (window.supabase) {
+                supabaseClient = window.supabase.createClient(url, key);
+                alert("Supabase connected! You can now Sign In or Sign Up.");
+                checkSupabaseUser();
+            }
+        }
+
+        async function checkSupabaseUser() {
+            if (!supabaseClient) return;
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            const badge = document.getElementById("supa-status-badge");
+            if (user) {
+                if (badge) {
+                    badge.innerText = `Connected: ${user.email}`;
+                    badge.className = "text-xs bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full";
+                }
+                loadSupabaseData(user.id);
+            } else {
+                if (badge) {
+                    badge.innerText = "Supabase Connected (Signed Out)";
+                    badge.className = "text-xs bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded-full";
+                }
+            }
+        }
+
+        async function supaSignUp() {
+            if (!supabaseClient) { alert("Please connect your Supabase project credentials first."); return; }
+            const email = document.getElementById("supa-email").value.trim();
+            const password = document.getElementById("supa-pass").value.trim();
+            if (!email || !password) { alert("Please enter an email address and password."); return; }
+
+            const { data, error } = await supabaseClient.auth.signUp({ email, password });
+            if (error) {
+                alert("Sign Up error: " + error.message);
+            } else {
+                alert("Account created successfully! Check your email or sign in now.");
+                checkSupabaseUser();
+            }
+        }
+
+        async function supaSignIn() {
+            if (!supabaseClient) { alert("Please connect your Supabase project credentials first."); return; }
+            const email = document.getElementById("supa-email").value.trim();
+            const password = document.getElementById("supa-pass").value.trim();
+            if (!email || !password) { alert("Please enter email and password."); return; }
+
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                alert("Sign In error: " + error.message);
+            } else {
+                alert("Signed in successfully to your Supabase PostgreSQL cloud account!");
+                checkSupabaseUser();
+            }
+        }
+
+        async function migrateLocalDataToSupabase() {
+            if (!supabaseClient) { alert("Please connect and sign in to Supabase first."); return; }
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            if (!user) { alert("Please sign in to your Supabase user account before migrating data."); return; }
+            if (!activeProfile) { alert("No active local profile selected."); return; }
+
+            try {
+                const employers = activeProfile.employers || [];
+                for (const emp of employers) {
+                    const { data: empRes } = await supabaseClient.from('employers').insert({
+                        user_id: user.id,
+                        name: emp.name,
+                        location: emp.location || 'Stockholm',
+                        default_tax_rate: emp.default_tax_rate || 0.32,
+                        notes: emp.notes || ''
+                    }).select().single();
+
+                    if (empRes) {
+                        const roles = emp.roles || [];
+                        for (const r of roles) {
+                            await supabaseClient.from('roles').insert({
+                                employer_id: empRes.id,
+                                user_id: user.id,
+                                role_name: r.role_name,
+                                hourly_rate: r.hourly_rate
+                            });
+                        }
+                    }
+                }
+
+                const shifts = activeProfile.shifts || [];
+                for (const s of shifts) {
+                    await supabaseClient.from('shifts').insert({
+                        user_id: user.id,
+                        employer_name: s.employer_name,
+                        role_name: s.role_name,
+                        date: s.date,
+                        start_time: s.start_time,
+                        end_time: s.end_time,
+                        unpaid_break_mins: s.unpaid_break_mins || 0,
+                        paid_hours: s.paid_hours,
+                        hourly_rate: s.hourly_rate,
+                        gross_pay: s.gross_pay,
+                        ob_pay: s.ob_pay || 0,
+                        tips: s.tips || 0,
+                        expenses: s.expenses || 0,
+                        net_pay: s.net_pay,
+                        status: s.status || 'worked',
+                        notes: s.notes || ''
+                    });
+                }
+
+                const payslips = activeProfile.payslips || [];
+                for (const p of payslips) {
+                    await supabaseClient.from('payslips').insert({
+                        user_id: user.id,
+                        employer_name: p.employer_name,
+                        pay_period_start: p.pay_period_start,
+                        pay_period_end: p.pay_period_end,
+                        actual_gross: p.actual_gross,
+                        actual_net: p.actual_net
+                    });
+                }
+
+                alert("🎉 Migration Complete! All local shifts, employers, and payslips are now permanently saved in your Supabase account.");
+                loadSupabaseData(user.id);
+            } catch (err) {
+                alert("Migration error: " + err.message);
+            }
+        }
+
+        async function loadSupabaseData(userId) {
+            if (!supabaseClient || !userId) return;
+            try {
+                const { data: shifts } = await supabaseClient.from('shifts').select('*').order('date', { ascending: false });
+                if (shifts && shifts.length > 0) {
+                    if (!activeProfile) activeProfile = profiles[0] || {};
+                    activeProfile.shifts = shifts.map(s => ({
+                        id: s.id,
+                        employer_name: s.employer_name,
+                        role_name: s.role_name,
+                        date: s.date,
+                        start_time: s.start_time,
+                        end_time: s.end_time,
+                        unpaid_break_mins: s.unpaid_break_mins,
+                        paid_hours: parseFloat(s.paid_hours),
+                        hourly_rate: parseFloat(s.hourly_rate),
+                        gross_pay: parseFloat(s.gross_pay),
+                        ob_pay: parseFloat(s.ob_pay || 0),
+                        tips: parseFloat(s.tips || 0),
+                        expenses: parseFloat(s.expenses || 0),
+                        net_pay: parseFloat(s.net_pay),
+                        status: s.status || 'worked',
+                        notes: s.notes || ''
+                    }));
+                    renderDashboard();
+                    renderLedger();
+                    renderCalendar();
+                }
+            } catch (e) {
+                console.error("Error loading Supabase data:", e);
+            }
+        }
+
+        // Initialize Supabase on page load
+        document.addEventListener("DOMContentLoaded", () => {
+            initSupabase();
+        });
+    </script>
+</body>
+</html>
