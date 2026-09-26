@@ -1276,7 +1276,7 @@
                         <h3 class="font-serif text-xl font-bold text-forest-900">${s.employer_name}</h3>
                         <p class="text-xs text-stone-500 mt-0.5">${s.date} · ${s.start_time}–${s.end_time} (${s.paid_hours}h) · ${s.role_name}</p>
                     </div>
-                    <button type="button" onclick="markShiftWorked(${s.id})" class="bg-rust-500 hover:bg-rust-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md transition">
+                    <button type="button" onclick="markShiftWorked('${s.id}')" class="bg-rust-500 hover:bg-rust-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md transition">
                         Mark as Worked ✓
                     </button>
                 `;
@@ -1326,14 +1326,41 @@
             if (scheduled) markShiftWorked(scheduled.id);
         }
 
-        function markShiftWorked(id) {
-            const s = activeProfile.shifts.find(x => x.id === id);
+        async function markShiftWorked(id) {
+            const sid = String(id);
+            const s = (activeProfile.shifts || []).find(x => String(x.id) === sid);
             if (s) {
                 s.status = 'worked';
                 saveProfiles();
                 renderDashboard();
+                renderLedger();
+                renderCalendar();
+                await syncShiftToSupabase(s);
                 alert(`Shift at ${s.employer_name} marked as Worked!`);
             }
+        }
+
+        function editShift(id) {
+            const sid = String(id);
+            const s = (activeProfile.shifts || []).find(x => String(x.id) === sid);
+            if (!s) return;
+            
+            document.getElementById("shift-edit-id").value = s.id;
+            document.getElementById("modal-shift-title").innerText = "Edit Shift";
+            
+            if (document.getElementById("shift-date")) document.getElementById("shift-date").value = s.date;
+            if (document.getElementById("shift-start")) document.getElementById("shift-start").value = s.start_time;
+            if (document.getElementById("shift-end")) document.getElementById("shift-end").value = s.end_time;
+            if (document.getElementById("shift-break")) document.getElementById("shift-break").value = s.unpaid_break_mins || 0;
+            if (document.getElementById("shift-rate")) document.getElementById("shift-rate").value = s.hourly_rate || 0;
+            if (document.getElementById("shift-ob")) document.getElementById("shift-ob").value = s.ob_pay || 0;
+            if (document.getElementById("shift-tips")) document.getElementById("shift-tips").value = s.tips || 0;
+            if (document.getElementById("shift-expenses")) document.getElementById("shift-expenses").value = s.expenses || 0;
+            if (document.getElementById("shift-status")) document.getElementById("shift-status").value = s.status || 'worked';
+            if (document.getElementById("shift-notes")) document.getElementById("shift-notes").value = s.notes || '';
+            
+            calcPreview();
+            openShiftModal();
         }
 
         function calcWhatIf() {
@@ -1497,7 +1524,7 @@
 
             if (!activeProfile.shifts) activeProfile.shifts = [];
             if (editId) {
-                activeProfile.shifts = activeProfile.shifts.map(s => s.id === newShift.id ? newShift : s);
+                activeProfile.shifts = activeProfile.shifts.map(s => String(s.id) === String(editId) ? newShift : s);
             } else {
                 activeProfile.shifts.unshift(newShift);
             }
@@ -1553,7 +1580,7 @@
                                 <span class="text-[10px] text-stone-400 block font-mono">${s.hourly_rate} kr/h</span>
                                 <span class="font-serif text-lg font-bold text-forest-900">${(s.net_pay || 0).toLocaleString('en-US', {minimumFractionDigits:2})} kr</span>
                             </div>
-                            <button type="button" onclick="deleteShift(${s.id})" title="Delete Shift" class="text-stone-300 hover:text-red-500 p-1">
+                            <button type="button" onclick="deleteShift('${s.id}')" title="Delete Shift" class="text-stone-300 hover:text-red-500 p-1">
                                 <i data-lucide="trash-2" class="w-4 h-4"></i>
                             </button>
                         </div>
@@ -1567,9 +1594,11 @@
 
         function deleteShift(id) {
             if (!confirm("Delete this shift record?")) return;
-            activeProfile.shifts = activeProfile.shifts.filter(s => s.id !== id);
+            const sid = String(id);
+            const targetShift = (activeProfile.shifts || []).find(s => String(s.id) === sid);
+            activeProfile.shifts = (activeProfile.shifts || []).filter(s => String(s.id) !== sid);
             saveProfiles();
-            deleteShiftFromSupabase(id);
+            deleteShiftFromSupabase(sid, targetShift);
             renderDashboard();
             renderLedger();
             renderCalendar();
@@ -2040,7 +2069,7 @@
                 }
                 if (!user) return;
 
-                await supabaseClient.from('shifts').insert({
+                const payload = {
                     user_id: user.id,
                     employer_name: s.employer_name,
                     role_name: s.role_name,
@@ -2057,7 +2086,19 @@
                     net_pay: s.net_pay,
                     status: s.status || 'worked',
                     notes: s.notes || ''
-                });
+                };
+
+                const sid = String(s.id);
+                if (sid.includes('-')) {
+                    payload.id = sid;
+                    await supabaseClient.from('shifts').upsert(payload);
+                } else {
+                    const { data: inserted } = await supabaseClient.from('shifts').insert(payload).select().single();
+                    if (inserted && inserted.id) {
+                        s.id = inserted.id;
+                        saveProfiles();
+                    }
+                }
             } catch(e) {
                 console.error("Shift Supabase sync error:", e);
             }
@@ -2091,13 +2132,21 @@
             }
         }
 
-        async function deleteShiftFromSupabase(shiftId) {
+        async function deleteShiftFromSupabase(shiftId, shiftObj) {
             if (!supabaseClient) return;
             try {
                 let { data: { user } } = await supabaseClient.auth.getUser();
                 if (!user) return;
-                if (typeof shiftId === 'string' && shiftId.includes('-')) {
-                    await supabaseClient.from('shifts').delete().eq('id', shiftId).eq('user_id', user.id);
+                
+                const sid = String(shiftId);
+                if (sid.includes('-')) {
+                    await supabaseClient.from('shifts').delete().eq('id', sid).eq('user_id', user.id);
+                } else if (shiftObj) {
+                    await supabaseClient.from('shifts').delete()
+                        .eq('user_id', user.id)
+                        .eq('date', shiftObj.date)
+                        .eq('start_time', shiftObj.start_time)
+                        .eq('employer_name', shiftObj.employer_name);
                 }
             } catch(e) {
                 console.error("Shift deletion error from Supabase:", e);
