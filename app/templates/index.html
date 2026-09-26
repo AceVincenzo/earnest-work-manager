@@ -1986,16 +1986,16 @@
                     if (!user) {
                         // Auto authenticate to global account so cross-device sync works out of the box!
                         const { data: signInRes, error: signInErr } = await supabaseClient.auth.signInWithPassword({
-                            email: 'global@earnest.app',
+                            email: 'alumayerbusiness@gmail.com',
                             password: 'EarnestGlobalSync2026!'
                         });
                         if (signInErr) {
                             await supabaseClient.auth.signUp({
-                                email: 'global@earnest.app',
+                                email: 'alumayerbusiness@gmail.com',
                                 password: 'EarnestGlobalSync2026!'
                             });
                             await supabaseClient.auth.signInWithPassword({
-                                email: 'global@earnest.app',
+                                email: 'alumayerbusiness@gmail.com',
                                 password: 'EarnestGlobalSync2026!'
                             });
                         }
@@ -2005,6 +2005,20 @@
 
                     if (user) {
                         checkSupabaseUser();
+                        // Realtime Subscription for cross-device live sync
+                        try {
+                            supabaseClient
+                                .channel('db-changes')
+                                .on('postgres_changes', { event: '*', schema: 'public', table: 'shifts' }, () => {
+                                    loadSupabaseData(user.id);
+                                })
+                                .on('postgres_changes', { event: '*', schema: 'public', table: 'employers' }, () => {
+                                    loadSupabaseData(user.id);
+                                })
+                                .subscribe();
+                        } catch(reErr) {
+                            console.log("Realtime subscription note:", reErr);
+                        }
                     }
                 } catch (e) {
                     console.error("Supabase init error:", e);
@@ -2018,7 +2032,7 @@
                 let { data: { user } } = await supabaseClient.auth.getUser();
                 if (!user) {
                     await supabaseClient.auth.signInWithPassword({
-                        email: 'global@earnest.app',
+                        email: 'alumayerbusiness@gmail.com',
                         password: 'EarnestGlobalSync2026!'
                     });
                     const res = await supabaseClient.auth.getUser();
