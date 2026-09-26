@@ -1947,12 +1947,20 @@
         // ---------------------------------------------------------
         
         // ---------------------------------------------------------
-        // 8. 100% FULLY CLOUD-DRIVEN SUPABASE POSTGRESQL ENGINE
+        
+        // ---------------------------------------------------------
+        // 8. HYBRID CLOUD POSTGRESQL & INSTANT STORAGE ENGINE
         // ---------------------------------------------------------
         const DEFAULT_SUPABASE_URL = "https://nbxjfqfnxwazoskykgjl.supabase.co";
         const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ieGpmcWZueHdhem9za3lrZ2psIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzNzY3MTEsImV4cCI6MjEwNTk1MjcxMX0.ozEAA4XaL6BrGUPL3D2GOKUCuKwAyqg4AuYfEo8KMao";
         let supabaseClient = null;
         let currentCloudUser = null;
+
+        function saveProfiles() {
+            try {
+                localStorage.setItem("earnest_profiles", JSON.stringify(profiles));
+            } catch(e) {}
+        }
 
         async function initSupabase() {
             if (window.supabase) {
@@ -2017,43 +2025,36 @@
                     .order('created_at', { ascending: true });
 
                 if (dbProfiles && dbProfiles.length > 0) {
-                    profiles = dbProfiles.map(p => ({
-                        id: p.id,
-                        name: p.name,
-                        avatar: p.avatar || p.name.charAt(0).toUpperCase(),
-                        pin: p.pin || null,
-                        isAdmin: p.is_admin || false,
-                        employers: [],
-                        shifts: [],
-                        payslips: [],
-                        goals: { hours: 100, net: 15000, shifts: 20 }
-                    }));
-                } else {
-                    const mainP = {
-                        id: 'p_admin',
-                        user_id: currentCloudUser.id,
-                        name: 'Main Profile',
-                        avatar: 'M',
-                        pin: null,
-                        is_admin: true
-                    };
-                    await supabaseClient.from('app_profiles').insert(mainP);
-                    profiles = [{
-                        id: 'p_admin',
-                        name: 'Main Profile',
-                        avatar: 'M',
-                        pin: null,
-                        isAdmin: true,
-                        employers: [],
-                        shifts: [],
-                        payslips: [],
-                        goals: { hours: 100, net: 15000, shifts: 20 }
-                    }];
+                    const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+                    profiles = dbProfiles.map(p => {
+                        const existing = profileMap.get(p.id) || {};
+                        return {
+                            id: p.id,
+                            name: p.name,
+                            avatar: p.avatar || p.name.charAt(0).toUpperCase(),
+                            pin: p.pin || null,
+                            isAdmin: p.is_admin || false,
+                            employers: existing.employers || [],
+                            shifts: existing.shifts || [],
+                            payslips: existing.payslips || [],
+                            goals: existing.goals || { hours: 100, net: 15000, shifts: 20 }
+                        };
+                    });
+                } else if (profiles && profiles.length > 0) {
+                    for (const p of profiles) {
+                        await syncProfileToSupabase(p);
+                    }
                 }
 
+                saveProfiles();
                 renderProfilesGrid();
                 renderAdminProfilesList();
-                showProfileScreen();
+
+                const activeId = localStorage.getItem("earnest_active_profile_id");
+                const cur = profiles.find(p => p.id === activeId) || activeProfile || profiles[0];
+                if (cur) {
+                    activateProfile(cur);
+                }
             } catch(e) {
                 console.error("Error fetching cloud profiles:", e);
             }
@@ -2133,6 +2134,7 @@
                 }
 
                 activeProfile = targetP;
+                saveProfiles();
                 renderDashboard();
                 loadEmployers();
                 loadEmployersOptions();
@@ -2141,6 +2143,22 @@
                 loadPayslips();
             } catch(e) {
                 console.error("Error loading cloud profile data:", e);
+            }
+        }
+
+        async function syncProfileToSupabase(p) {
+            if (!supabaseClient || !currentCloudUser) return;
+            try {
+                await supabaseClient.from('app_profiles').upsert({
+                    id: p.id,
+                    user_id: currentCloudUser.id,
+                    name: p.name,
+                    avatar: p.avatar || p.name.charAt(0).toUpperCase(),
+                    pin: p.pin || null,
+                    is_admin: p.isAdmin || false
+                });
+            } catch(e) {
+                console.error("Profile Supabase sync error:", e);
             }
         }
 
@@ -2175,6 +2193,7 @@
                     const { data: inserted } = await supabaseClient.from('shifts').insert(payload).select().single();
                     if (inserted && inserted.id) {
                         s.id = inserted.id;
+                        saveProfiles();
                     }
                 }
             } catch(e) {
@@ -2241,55 +2260,103 @@
 
             const newId = "p_" + Date.now();
             const pin = (pinVal && pinVal.length === 4) ? pinVal : null;
+            const newP = {
+                id: newId,
+                name: name,
+                avatar: name.charAt(0).toUpperCase(),
+                pin: pin,
+                isAdmin: false,
+                employers: (activeProfile && activeProfile.employers) ? activeProfile.employers : defaultEmployers,
+                shifts: [],
+                payslips: [],
+                goals: { hours: 100, net: 15000, shifts: 20 }
+            };
+
+            profiles.push(newP);
+            saveProfiles();
+            renderProfilesGrid();
+            renderAdminProfilesList();
 
             if (supabaseClient && currentCloudUser) {
-                await supabaseClient.from('app_profiles').insert({
-                    id: newId,
-                    user_id: currentCloudUser.id,
-                    name: name,
-                    avatar: name.charAt(0).toUpperCase(),
-                    pin: pin,
-                    is_admin: false
-                });
+                await syncProfileToSupabase(newP);
             }
 
             closeModal("modal-admin");
             document.getElementById("admin-new-name").value = "";
             if (document.getElementById("admin-new-pin")) document.getElementById("admin-new-pin").value = "";
             
-            alert(`Profile '${name}' created in Cloud!`);
-            await fetchCloudProfiles();
+            alert(`Profile '${name}' created & saved!`);
+            activateProfile(newP);
         }
 
         async function adminDeleteProfile(id) {
+            if (id === 'p_admin') {
+                alert("Main Admin Profile cannot be deleted.");
+                return;
+            }
             if (!confirm("Delete this profile from Cloud PostgreSQL?")) return;
+            profiles = profiles.filter(p => p.id !== id);
+            saveProfiles();
+            renderProfilesGrid();
+            renderAdminProfilesList();
+
             if (supabaseClient && currentCloudUser) {
                 await supabaseClient.from('app_profiles').delete().eq('id', id).eq('user_id', currentCloudUser.id);
             }
-            await fetchCloudProfiles();
         }
 
         async function activateProfile(p) {
             if (!p) return;
+            activeProfile = p;
+            localStorage.setItem("earnest_active_profile_id", p.id);
+
             document.getElementById("screen-profiles").classList.add("hidden");
             document.getElementById("app-main").classList.remove("hidden");
 
             if (document.getElementById("header-avatar")) document.getElementById("header-avatar").innerText = p.avatar || p.name.charAt(0);
             if (document.getElementById("header-profile-name")) document.getElementById("header-profile-name").innerText = p.name;
 
-            await loadCloudDataForProfile(p.id);
+            renderDashboard();
+            loadEmployers();
+            loadEmployersOptions();
+            renderLedger();
+            renderCalendar();
+            loadPayslips();
+
+            if (supabaseClient && currentCloudUser) {
+                await loadCloudDataForProfile(p.id);
+            }
         }
 
         function loadProfiles() {
-            initSupabase();
-        }
+            const stored = localStorage.getItem("earnest_profiles");
+            if (stored) {
+                try { profiles = JSON.parse(stored); } catch(e) {}
+            }
 
-        function saveProfiles() {
-            // Cloud-driven; no local storage needed
+            if (!profiles || profiles.length === 0) {
+                profiles = [
+                    { id: "p_admin", name: "Main Profile", pin: null, isAdmin: true, avatar: "M", employers: defaultEmployers, shifts: defaultShifts, payslips: [], goals: { hours: 100, net: 15000, shifts: 20 } }
+                ];
+                saveProfiles();
+            }
+
+            renderProfilesGrid();
+            renderAdminProfilesList();
+
+            const activeId = localStorage.getItem("earnest_active_profile_id");
+            const activeP = profiles.find(p => p.id === activeId) || profiles[0];
+            if (activeP) {
+                activateProfile(activeP);
+            } else {
+                showProfileScreen();
+            }
+
+            initSupabase();
         }
 
         document.addEventListener("DOMContentLoaded", () => {
-            initSupabase();
+            loadProfiles();
         });
     
     </script>
