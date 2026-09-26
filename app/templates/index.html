@@ -57,6 +57,25 @@
         </div>
 
         <div id="profiles-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-xl w-full"></div>
+
+        <!-- SUPABASE CLOUD ACCOUNT BANNER ON FRONT SCREEN -->
+        <div class="bg-white border border-stone-200 rounded-3xl p-5 max-w-xl w-full flex flex-col sm:flex-row sm:items-center justify-between gap-4 card-shadow">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-forest-900 text-cream-50 flex items-center justify-center font-bold shrink-0">
+                    <i data-lucide="database" class="w-5 h-5 text-rust-500"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-serif font-bold text-base text-forest-900">Supabase Cloud Account</span>
+                        <span id="front-supa-badge" class="text-[10px] bg-stone-100 text-stone-600 font-bold px-2 py-0.5 rounded-full">Offline / Local Mode</span>
+                    </div>
+                    <span id="front-supa-desc" class="text-xs text-stone-500 block">Permanent PostgreSQL history across iPhone, iPad & PC</span>
+                </div>
+            </div>
+            <button type="button" onclick="openCloudModal()" class="bg-rust-500 hover:bg-rust-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-md transition shrink-0">
+                <i data-lucide="cloud-lightning" class="w-4 h-4"></i> Cloud Account
+            </button>
+        </div>
     </div>
 
     <!-- 2. PIN PAD MODAL -->
@@ -117,9 +136,13 @@
                 </div>
 
                 <!-- Right Actions & Active Profile -->
-                <div class="flex items-center gap-2.5">
+                <div class="flex items-center gap-2">
                     <button type="button" onclick="openShiftModal()" class="bg-forest-900 hover:bg-forest-800 text-cream-50 font-semibold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-md transition">
                         <i data-lucide="plus" class="w-4 h-4 text-rust-500"></i> <span class="hidden xs:inline">Log</span> Shift
+                    </button>
+
+                    <button type="button" onclick="openCloudModal()" class="bg-forest-900 hover:bg-forest-800 text-cream-50 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-md transition" title="Supabase Cloud PostgreSQL Database">
+                        <i data-lucide="database" class="w-4 h-4 text-rust-500"></i> <span class="hidden sm:inline">Cloud DB</span>
                     </button>
                     
                     <button type="button" onclick="openAdminModal()" class="bg-rust-500 hover:bg-rust-600 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-sm transition">
@@ -983,6 +1006,74 @@
                     <button type="submit" class="bg-forest-900 text-cream-50 font-bold py-2 rounded-xl text-xs hover:bg-forest-800 transition">Create Profile</button>
                 </form>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL 5: DEDICATED SUPABASE CLOUD DATABASE & AUTH MODAL -->
+    <div id="modal-cloud-account" class="fixed inset-0 bg-forest-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-[#FAF8F5] border border-stone-200 max-w-xl w-full rounded-3xl p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-stone-200 pb-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-forest-900 text-cream-50 flex items-center justify-center font-bold">
+                        <i data-lucide="database" class="w-5 h-5 text-rust-500"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-serif text-2xl text-forest-900">Supabase Cloud Account</h3>
+                        <p class="text-xs text-stone-500">Permanent PostgreSQL storage with Row Level Security across iPhone & PC</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeModal('modal-cloud-account')" class="text-stone-400 hover:text-stone-700"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <!-- Status Badge -->
+            <div class="bg-stone-50 border border-stone-200 p-4 rounded-2xl flex items-center justify-between">
+                <span class="text-xs font-semibold text-stone-700">Account Connection Status:</span>
+                <span id="modal-supa-badge" class="text-xs bg-stone-100 text-stone-600 font-bold px-3 py-1 rounded-full">Offline / Local Mode</span>
+            </div>
+
+            <!-- Sign In / Sign Up Form -->
+            <div class="space-y-4">
+                <span class="text-xs font-bold text-forest-900 uppercase tracking-wider block">1. Sign In or Create User Account</span>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input type="email" id="modal-supa-email" placeholder="Email (e.g. user@example.com)" class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-xs text-forest-900">
+                    <input type="password" id="modal-supa-pass" placeholder="Password (min 6 chars)" class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2.5 text-xs text-forest-900">
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="modalSupaSignIn()" class="flex-1 bg-rust-500 hover:bg-rust-600 text-white font-bold py-2.5 rounded-xl text-xs transition">
+                        Sign In
+                    </button>
+                    <button type="button" onclick="modalSupaSignUp()" class="flex-1 bg-forest-900 hover:bg-forest-800 text-cream-50 font-bold py-2.5 rounded-xl text-xs transition">
+                        Create Account
+                    </button>
+                </div>
+            </div>
+
+            <!-- Migration & Credentials Toggle -->
+            <div class="border-t border-stone-200 pt-4 space-y-3">
+                <span class="text-xs font-bold text-forest-900 uppercase tracking-wider block">2. Migrate Existing Local Shifts to Cloud</span>
+                <p class="text-xs text-stone-500">Safely uploads all your existing local shifts, employers, and payslips into your Supabase account without losing any data.</p>
+                <button type="button" onclick="migrateLocalDataToSupabase()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 rounded-2xl text-xs flex items-center justify-center gap-2 shadow-md transition">
+                    <i data-lucide="upload-cloud" class="w-4 h-4"></i> Migrate Local Data to Cloud Database
+                </button>
+            </div>
+
+            <!-- Custom Supabase Project Credentials (Collapsible / Editable) -->
+            <details class="border-t border-stone-200 pt-3 text-xs">
+                <summary class="font-bold text-stone-600 cursor-pointer hover:text-forest-900">Advanced: Custom Supabase Credentials</summary>
+                <div class="space-y-3 pt-3">
+                    <div>
+                        <label class="block text-stone-600 mb-1">Supabase Project URL</label>
+                        <input type="text" id="modal-supa-url" placeholder="https://your-project.supabase.co" class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-stone-600 mb-1">Anon API Key</label>
+                        <input type="password" id="modal-supa-key" placeholder="eyJhbGciOi..." class="w-full bg-white border border-stone-200 rounded-xl px-3 py-2 text-xs">
+                    </div>
+                    <button type="button" onclick="saveModalSupabaseConfig()" class="bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold px-4 py-2 rounded-xl text-xs">
+                        Save Project Credentials
+                    </button>
+                </div>
+            </details>
         </div>
     </div>
 
@@ -1921,21 +2012,100 @@
             }
         }
 
+        function openCloudModal() {
+            const url = localStorage.getItem("earnest_supa_url") || "";
+            const key = localStorage.getItem("earnest_supa_key") || "";
+            if (url && document.getElementById("modal-supa-url")) document.getElementById("modal-supa-url").value = url;
+            if (key && document.getElementById("modal-supa-key")) document.getElementById("modal-supa-key").value = key;
+            document.getElementById("modal-cloud-account").classList.remove("hidden");
+            checkSupabaseUser();
+        }
+
+        function saveModalSupabaseConfig() {
+            const url = document.getElementById("modal-supa-url").value.trim();
+            const key = document.getElementById("modal-supa-key").value.trim();
+            if (!url || !key) { alert("Please enter both Supabase URL and Anon Key."); return; }
+            localStorage.setItem("earnest_supa_url", url);
+            localStorage.setItem("earnest_supa_key", key);
+            if (window.supabase) {
+                supabaseClient = window.supabase.createClient(url, key);
+                alert("Supabase connected!");
+                checkSupabaseUser();
+            }
+        }
+
+        async function modalSupaSignIn() {
+            const email = document.getElementById("modal-supa-email").value.trim();
+            const password = document.getElementById("modal-supa-pass").value.trim();
+            if (!email || !password) { alert("Please enter email and password."); return; }
+
+            if (!supabaseClient) {
+                const url = localStorage.getItem("earnest_supa_url") || document.getElementById("modal-supa-url")?.value.trim();
+                const key = localStorage.getItem("earnest_supa_key") || document.getElementById("modal-supa-key")?.value.trim();
+                if (url && key && window.supabase) {
+                    supabaseClient = window.supabase.createClient(url, key);
+                } else {
+                    alert("Please enter your Supabase URL & Anon Key under Advanced Credentials first.");
+                    return;
+                }
+            }
+
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                alert("Sign In error: " + error.message);
+            } else {
+                alert("Signed in successfully to your Supabase PostgreSQL cloud account!");
+                closeModal("modal-cloud-account");
+                checkSupabaseUser();
+            }
+        }
+
+        async function modalSupaSignUp() {
+            const email = document.getElementById("modal-supa-email").value.trim();
+            const password = document.getElementById("modal-supa-pass").value.trim();
+            if (!email || !password) { alert("Please enter email and password."); return; }
+
+            if (!supabaseClient) {
+                const url = localStorage.getItem("earnest_supa_url") || document.getElementById("modal-supa-url")?.value.trim();
+                const key = localStorage.getItem("earnest_supa_key") || document.getElementById("modal-supa-key")?.value.trim();
+                if (url && key && window.supabase) {
+                    supabaseClient = window.supabase.createClient(url, key);
+                } else {
+                    alert("Please enter your Supabase URL & Anon Key under Advanced Credentials first.");
+                    return;
+                }
+            }
+
+            const { data, error } = await supabaseClient.auth.signUp({ email, password });
+            if (error) {
+                alert("Sign Up error: " + error.message);
+            } else {
+                alert("Account created successfully!");
+                checkSupabaseUser();
+            }
+        }
+
         async function checkSupabaseUser() {
             if (!supabaseClient) return;
             const { data: { user } } = await supabaseClient.auth.getUser();
             const badge = document.getElementById("supa-status-badge");
+            const modalBadge = document.getElementById("modal-supa-badge");
+            const frontBadge = document.getElementById("front-supa-badge");
+            const frontDesc = document.getElementById("front-supa-desc");
+
             if (user) {
-                if (badge) {
-                    badge.innerText = `Connected: ${user.email}`;
-                    badge.className = "text-xs bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full";
-                }
+                const label = `Connected: ${user.email}`;
+                if (badge) { badge.innerText = label; badge.className = "text-xs bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full"; }
+                if (modalBadge) { modalBadge.innerText = label; modalBadge.className = "text-xs bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full"; }
+                if (frontBadge) { frontBadge.innerText = "Cloud Active 🟢"; frontBadge.className = "text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full"; }
+                if (frontDesc) { frontDesc.innerText = `Signed in as ${user.email} (PostgreSQL cloud database)`; }
                 loadSupabaseData(user.id);
             } else {
-                if (badge) {
-                    badge.innerText = "Supabase Connected (Signed Out)";
-                    badge.className = "text-xs bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded-full";
-                }
+                const label = "Supabase Connected (Signed Out)";
+                if (badge) { badge.innerText = label; badge.className = "text-xs bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded-full"; }
+                if (modalBadge) { modalBadge.innerText = label; modalBadge.className = "text-xs bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded-full"; }
+                if (frontBadge) { frontBadge.innerText = "Offline / Local Mode"; frontBadge.className = "text-[10px] bg-stone-100 text-stone-600 font-bold px-2 py-0.5 rounded-full"; }
+                if (frontDesc) { frontDesc.innerText = "Permanent PostgreSQL history across iPhone, iPad & PC"; }
             }
         }
 
