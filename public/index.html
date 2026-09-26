@@ -1110,44 +1110,6 @@
             }
             return null;
         }
-        async function loadProfiles() {
-            const stored = localStorage.getItem("earnest_profiles");
-            if (stored) {
-                try { profiles = JSON.parse(stored); } catch(e) {}
-            }
-
-            try {
-                const res = await fetch("/api/profiles");
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.profiles && data.profiles.length > 0) {
-                        profiles = data.profiles;
-                        localStorage.setItem("earnest_profiles", JSON.stringify(profiles));
-                    }
-                }
-            } catch (e) {}
-
-            if (!profiles || profiles.length === 0) {
-                profiles = [
-                    { id: "p_admin", name: "Main Profile", pin: null, isAdmin: true, avatar: "M", employers: defaultEmployers, shifts: defaultShifts, payslips: [], goals: { hours: 100, net: 15000, shifts: 20 } }
-                ];
-                saveProfiles();
-            }
-            // Always present Netflix-style Profile Selection Screen on web app entry!
-            showProfileScreen();
-        }
-
-        function saveProfiles() {
-            localStorage.setItem("earnest_profiles", JSON.stringify(profiles));
-            try {
-                fetch("/api/profiles", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ profiles: profiles })
-                }).catch(() => {});
-            } catch(e) {}
-        }
-
         function renderProfilesGrid() {
             const grid = document.getElementById("profiles-grid");
             if (!grid) return;
@@ -1220,22 +1182,6 @@
                 alert("Incorrect PIN code");
                 clearPin();
             }
-        }
-
-        function activateProfile(p) {
-            activeProfile = p;
-            if (p && p.id) localStorage.setItem("earnest_active_profile_id", p.id);
-            document.getElementById("screen-profiles").classList.add("hidden");
-            document.getElementById("app-main").classList.remove("hidden");
-
-            if (document.getElementById("header-avatar")) document.getElementById("header-avatar").innerText = p.avatar || p.name.charAt(0);
-            if (document.getElementById("header-profile-name")) document.getElementById("header-profile-name").innerText = p.name;
-
-            renderDashboard();
-            loadEmployers();
-            renderLedger();
-            renderCalendar();
-            loadPayslips();
         }
 
         function showProfileScreen() {
@@ -1937,37 +1883,6 @@
                 `;
             });
             lucide.createIcons();
-        }
-
-        function adminCreateProfile(e) {
-            e.preventDefault();
-            const name = document.getElementById("admin-new-name").value.trim();
-            const pinVal = document.getElementById("admin-new-pin")?.value.trim();
-
-            if (!name) {
-                alert("Please enter a profile name.");
-                return;
-            }
-
-            const newP = {
-                id: "p_" + Date.now(),
-                name: name,
-                pin: (pinVal && pinVal.length === 4) ? pinVal : null,
-                isAdmin: profiles.length === 0,
-                avatar: name.charAt(0).toUpperCase(),
-                employers: (activeProfile && activeProfile.employers) ? activeProfile.employers : defaultEmployers,
-                shifts: [],
-                payslips: [],
-                goals: { hours: 100, net: 15000, shifts: 20 }
-            };
-
-            profiles.push(newP);
-            saveProfiles();
-            syncProfileToSupabase(newP);
-            closeModal("modal-admin");
-            renderAdminProfilesList();
-            renderProfilesGrid();
-            alert(`Profile '${name}' created & synced across devices!`);
         }
 
         function exportSyncCode() {
