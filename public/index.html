@@ -1245,12 +1245,7 @@
         function showProfileScreen() {
             document.getElementById("app-main").classList.add("hidden");
             document.getElementById("screen-profiles").classList.remove("hidden");
-            const cur = getActiveProfile();
-            if (cur) {
-                activateProfile(cur);
-            } else {
-                renderProfilesGrid();
-            }
+            renderProfilesGrid();
         }
 
         // ---------------------------------------------------------
