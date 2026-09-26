@@ -1104,11 +1104,15 @@
 
             if (!profiles || profiles.length === 0) {
                 profiles = [
-                    { id: "p_admin", name: "Main Profile", pin: "1234", isAdmin: true, avatar: "M", employers: defaultEmployers, shifts: defaultShifts, payslips: [], goals: { hours: 100, net: 15000, shifts: 20 } }
+                    { id: "p_admin", name: "Main Profile", pin: null, isAdmin: true, avatar: "M", employers: defaultEmployers, shifts: defaultShifts, payslips: [], goals: { hours: 100, net: 15000, shifts: 20 } }
                 ];
                 saveProfiles();
             }
-            renderProfilesGrid();
+            if (profiles.length > 0) {
+                activateProfile(profiles[0]);
+            } else {
+                renderProfilesGrid();
+            }
         }
 
         function saveProfiles() {
@@ -1200,7 +1204,11 @@
         function showProfileScreen() {
             document.getElementById("app-main").classList.add("hidden");
             document.getElementById("screen-profiles").classList.remove("hidden");
-            renderProfilesGrid();
+            if (profiles.length > 0) {
+                activateProfile(profiles[0]);
+            } else {
+                renderProfilesGrid();
+            }
         }
 
         // ---------------------------------------------------------
@@ -1561,6 +1569,7 @@
             if (!confirm("Delete this shift record?")) return;
             activeProfile.shifts = activeProfile.shifts.filter(s => s.id !== id);
             saveProfiles();
+            deleteShiftFromSupabase(id);
             renderDashboard();
             renderLedger();
             renderCalendar();
@@ -1769,6 +1778,8 @@
             saveProfiles();
             closeModal("modal-add-employer");
             loadEmployers();
+            loadEmployersOptions();
+            syncEmployerToSupabase(newEmp);
             alert(`Employer '${name}' saved!`);
         }
 
@@ -1920,16 +1931,20 @@
 
         function subscribeAppleCalendar() {
             const icsData = buildICSContent();
-            window.location.href = 'data:text/calendar;charset=utf8,' + encodeURIComponent(icsData);
+            const base64Data = btoa(unescape(encodeURIComponent(icsData)));
+            const dataUrl = 'data:text/calendar;charset=utf-8;base64,' + base64Data;
+            
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = 'earnest_shifts.ics';
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
 
         function downloadICS() {
-            const icsData = buildICSContent();
-            const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = 'earnest_shifts.ics';
-            a.click();
+            subscribeAppleCalendar();
         }
 
         function buildICSContent() {
@@ -2034,13 +2049,75 @@
             }
         }
 
+        async function syncEmployerToSupabase(emp) {
+            if (!supabaseClient) return;
+            try {
+                let { data: { user } } = await supabaseClient.auth.getUser();
+                if (!user) return;
+                const { data: empRes } = await supabaseClient.from('employers').insert({
+                    user_id: user.id,
+                    name: emp.name,
+                    location: emp.location || 'Stockholm',
+                    default_tax_rate: emp.default_tax_rate || 0.32,
+                    notes: emp.notes || ''
+                }).select().single();
+
+                if (empRes && emp.roles && emp.roles.length > 0) {
+                    for (const r of emp.roles) {
+                        await supabaseClient.from('roles').insert({
+                            employer_id: empRes.id,
+                            user_id: user.id,
+                            role_name: r.role_name,
+                            hourly_rate: r.hourly_rate
+                        });
+                    }
+                }
+            } catch(e) {
+                console.error("Employer Supabase sync error:", e);
+            }
+        }
+
+        async function deleteShiftFromSupabase(shiftId) {
+            if (!supabaseClient) return;
+            try {
+                let { data: { user } } = await supabaseClient.auth.getUser();
+                if (!user) return;
+                if (typeof shiftId === 'string' && shiftId.includes('-')) {
+                    await supabaseClient.from('shifts').delete().eq('id', shiftId).eq('user_id', user.id);
+                }
+            } catch(e) {
+                console.error("Shift deletion error from Supabase:", e);
+            }
+        }
+
         async function loadSupabaseData(userId) {
             if (!supabaseClient || !userId) return;
             try {
-                const { data: shifts, error } = await supabaseClient.from('shifts').select('*').order('date', { ascending: false });
-                if (shifts && shifts.length > 0) {
-                    if (!activeProfile) activeProfile = (profiles && profiles[0]) ? profiles[0] : { shifts: [] };
-                    activeProfile.shifts = shifts.map(s => ({
+                // Fetch Employers
+                const { data: dbEmployers } = await supabaseClient.from('employers').select('*, roles(*)');
+                if (dbEmployers && dbEmployers.length > 0) {
+                    if (!activeProfile) activeProfile = profiles[0] || {};
+                    activeProfile.employers = dbEmployers.map(emp => ({
+                        id: emp.id,
+                        name: emp.name,
+                        location: emp.location || 'Stockholm',
+                        default_tax_rate: parseFloat(emp.default_tax_rate || 0.32),
+                        notes: emp.notes || '',
+                        roles: (emp.roles || []).map(r => ({
+                            id: r.id,
+                            role_name: r.role_name,
+                            hourly_rate: parseFloat(r.hourly_rate)
+                        }))
+                    }));
+                    loadEmployers();
+                    loadEmployersOptions();
+                }
+
+                // Fetch Shifts
+                const { data: dbShifts } = await supabaseClient.from('shifts').select('*').order('date', { ascending: false });
+                if (dbShifts && dbShifts.length > 0) {
+                    if (!activeProfile) activeProfile = profiles[0] || {};
+                    activeProfile.shifts = dbShifts.map(s => ({
                         id: s.id,
                         employer_name: s.employer_name,
                         role_name: s.role_name,
@@ -2062,6 +2139,23 @@
                     renderLedger();
                     renderCalendar();
                 }
+
+                // Fetch Payslips
+                const { data: dbPayslips } = await supabaseClient.from('payslips').select('*').order('pay_period_start', { ascending: false });
+                if (dbPayslips && dbPayslips.length > 0) {
+                    if (!activeProfile) activeProfile = profiles[0] || {};
+                    activeProfile.payslips = dbPayslips.map(p => ({
+                        id: p.id,
+                        employer_name: p.employer_name,
+                        pay_period_start: p.pay_period_start,
+                        pay_period_end: p.pay_period_end,
+                        actual_gross: parseFloat(p.actual_gross),
+                        actual_net: parseFloat(p.actual_net)
+                    }));
+                    loadPayslips();
+                }
+
+                saveProfiles();
             } catch (e) {
                 console.error("Error loading Supabase data:", e);
             }
