@@ -2156,8 +2156,23 @@
                 }
 
                 saveProfiles();
+                autoSyncLocalDataToSupabase(userId);
             } catch (e) {
                 console.error("Error loading Supabase data:", e);
+            }
+        }
+
+        async function autoSyncLocalDataToSupabase(userId) {
+            if (!supabaseClient || !userId || !activeProfile) return;
+            try {
+                const localShifts = activeProfile.shifts || [];
+                for (const s of localShifts) {
+                    if (typeof s.id === 'number' || !String(s.id).includes('-')) {
+                        await syncShiftToSupabase(s);
+                    }
+                }
+            } catch(e) {
+                console.error("Auto sync error:", e);
             }
         }
 
