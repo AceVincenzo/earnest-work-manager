@@ -1133,12 +1133,8 @@
                 ];
                 saveProfiles();
             }
-            const cur = getActiveProfile();
-            if (cur) {
-                activateProfile(cur);
-            } else {
-                renderProfilesGrid();
-            }
+            // Always present Netflix-style Profile Selection Screen on web app entry!
+            showProfileScreen();
         }
 
         function saveProfiles() {
@@ -1967,11 +1963,11 @@
 
             profiles.push(newP);
             saveProfiles();
+            syncProfileToSupabase(newP);
             closeModal("modal-admin");
             renderAdminProfilesList();
             renderProfilesGrid();
-            activateProfile(newP);
-            alert(`Profile '${name}' created successfully!`);
+            alert(`Profile '${name}' created & synced across devices!`);
         }
 
         function exportSyncCode() {
@@ -2084,6 +2080,9 @@
                                 .on('postgres_changes', { event: '*', schema: 'public', table: 'employers' }, () => {
                                     loadSupabaseData(user.id);
                                 })
+                                .on('postgres_changes', { event: '*', schema: 'public', table: 'app_profiles' }, () => {
+                                    loadSupabaseData(user.id);
+                                })
                                 .subscribe();
                         } catch(reErr) {
                             console.log("Realtime subscription note:", reErr);
@@ -2169,6 +2168,24 @@
                 }
             } catch(e) {
                 console.error("Employer Supabase sync error:", e);
+            }
+        }
+
+        async function syncProfileToSupabase(p) {
+            if (!supabaseClient) return;
+            try {
+                let { data: { user } } = await supabaseClient.auth.getUser();
+                if (!user) return;
+                await supabaseClient.from('app_profiles').upsert({
+                    id: p.id,
+                    user_id: user.id,
+                    name: p.name,
+                    avatar: p.avatar || p.name.charAt(0).toUpperCase(),
+                    pin: p.pin || null,
+                    is_admin: p.isAdmin || false
+                });
+            } catch(e) {
+                console.error("Profile Supabase sync error:", e);
             }
         }
 
