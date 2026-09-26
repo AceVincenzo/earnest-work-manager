@@ -1094,6 +1094,22 @@
         // ---------------------------------------------------------
         // PROFILE SYSTEM & STORAGE
         // ---------------------------------------------------------
+        function getActiveProfile() {
+            if (activeProfile) return activeProfile;
+            const activeId = localStorage.getItem("earnest_active_profile_id");
+            if (activeId && profiles && profiles.length > 0) {
+                const found = profiles.find(p => p.id === activeId);
+                if (found) {
+                    activeProfile = found;
+                    return activeProfile;
+                }
+            }
+            if (profiles && profiles.length > 0) {
+                activeProfile = profiles[0];
+                return activeProfile;
+            }
+            return null;
+        }
         async function loadProfiles() {
             const stored = localStorage.getItem("earnest_profiles");
             if (stored) {
@@ -1117,8 +1133,9 @@
                 ];
                 saveProfiles();
             }
-            if (profiles.length > 0) {
-                activateProfile(profiles[0]);
+            const cur = getActiveProfile();
+            if (cur) {
+                activateProfile(cur);
             } else {
                 renderProfilesGrid();
             }
@@ -1228,8 +1245,9 @@
         function showProfileScreen() {
             document.getElementById("app-main").classList.add("hidden");
             document.getElementById("screen-profiles").classList.remove("hidden");
-            if (profiles.length > 0) {
-                activateProfile(profiles[0]);
+            const cur = getActiveProfile();
+            if (cur) {
+                activateProfile(cur);
             } else {
                 renderProfilesGrid();
             }
@@ -2186,7 +2204,7 @@
                 // Fetch Employers
                 const { data: dbEmployers } = await supabaseClient.from('employers').select('*, roles(*)');
                 if (dbEmployers && dbEmployers.length > 0) {
-                    if (!activeProfile) activeProfile = profiles[0] || {};
+                    activeProfile = getActiveProfile();
                     activeProfile.employers = dbEmployers.map(emp => ({
                         id: emp.id,
                         name: emp.name,
@@ -2206,7 +2224,7 @@
                 // Fetch Shifts
                 const { data: dbShifts } = await supabaseClient.from('shifts').select('*').order('date', { ascending: false });
                 if (dbShifts && dbShifts.length > 0) {
-                    if (!activeProfile) activeProfile = profiles[0] || {};
+                    activeProfile = getActiveProfile();
                     activeProfile.shifts = dbShifts.map(s => ({
                         id: s.id,
                         employer_name: s.employer_name,
@@ -2233,7 +2251,7 @@
                 // Fetch Payslips
                 const { data: dbPayslips } = await supabaseClient.from('payslips').select('*').order('pay_period_start', { ascending: false });
                 if (dbPayslips && dbPayslips.length > 0) {
-                    if (!activeProfile) activeProfile = profiles[0] || {};
+                    activeProfile = getActiveProfile();
                     activeProfile.payslips = dbPayslips.map(p => ({
                         id: p.id,
                         employer_name: p.employer_name,
@@ -2488,7 +2506,7 @@
             try {
                 const { data: shifts } = await supabaseClient.from('shifts').select('*').order('date', { ascending: false });
                 if (shifts && shifts.length > 0) {
-                    if (!activeProfile) activeProfile = profiles[0] || {};
+                    activeProfile = getActiveProfile();
                     activeProfile.shifts = shifts.map(s => ({
                         id: s.id,
                         employer_name: s.employer_name,
