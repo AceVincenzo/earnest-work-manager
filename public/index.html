@@ -1494,6 +1494,7 @@
                 activeProfile.shifts.unshift(newShift);
             }
             saveProfiles();
+            syncShiftToSupabase(newShift);
         }
 
         function filterShiftStatus(status) {
@@ -1955,7 +1956,7 @@
         const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ieGpmcWZueHdhem9za3lrZ2psIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzNzY3MTEsImV4cCI6MjEwNTk1MjcxMX0.ozEAA4XaL6BrGUPL3D2GOKUCuKwAyqg4AuYfEo8KMao";
         let supabaseClient = null;
 
-        function initSupabase() {
+        async function initSupabase() {
             const url = localStorage.getItem("earnest_supa_url") || DEFAULT_SUPABASE_URL;
             const key = localStorage.getItem("earnest_supa_key") || DEFAULT_SUPABASE_ANON_KEY;
 
@@ -1965,10 +1966,104 @@
             if (window.supabase) {
                 try {
                     supabaseClient = window.supabase.createClient(url, key);
-                    checkSupabaseUser();
+                    
+                    let { data: { user } } = await supabaseClient.auth.getUser();
+                    if (!user) {
+                        // Auto authenticate to global account so cross-device sync works out of the box!
+                        const { data: signInRes, error: signInErr } = await supabaseClient.auth.signInWithPassword({
+                            email: 'global@earnest.app',
+                            password: 'EarnestGlobalSync2026!'
+                        });
+                        if (signInErr) {
+                            await supabaseClient.auth.signUp({
+                                email: 'global@earnest.app',
+                                password: 'EarnestGlobalSync2026!'
+                            });
+                            await supabaseClient.auth.signInWithPassword({
+                                email: 'global@earnest.app',
+                                password: 'EarnestGlobalSync2026!'
+                            });
+                        }
+                        const res = await supabaseClient.auth.getUser();
+                        user = res.data?.user;
+                    }
+
+                    if (user) {
+                        checkSupabaseUser();
+                    }
                 } catch (e) {
                     console.error("Supabase init error:", e);
                 }
+            }
+        }
+
+        async function syncShiftToSupabase(s) {
+            if (!supabaseClient) return;
+            try {
+                let { data: { user } } = await supabaseClient.auth.getUser();
+                if (!user) {
+                    await supabaseClient.auth.signInWithPassword({
+                        email: 'global@earnest.app',
+                        password: 'EarnestGlobalSync2026!'
+                    });
+                    const res = await supabaseClient.auth.getUser();
+                    user = res.data?.user;
+                }
+                if (!user) return;
+
+                await supabaseClient.from('shifts').insert({
+                    user_id: user.id,
+                    employer_name: s.employer_name,
+                    role_name: s.role_name,
+                    date: s.date,
+                    start_time: s.start_time,
+                    end_time: s.end_time,
+                    unpaid_break_mins: s.unpaid_break_mins || 0,
+                    paid_hours: s.paid_hours,
+                    hourly_rate: s.hourly_rate,
+                    gross_pay: s.gross_pay,
+                    ob_pay: s.ob_pay || 0,
+                    tips: s.tips || 0,
+                    expenses: s.expenses || 0,
+                    net_pay: s.net_pay,
+                    status: s.status || 'worked',
+                    notes: s.notes || ''
+                });
+            } catch(e) {
+                console.error("Shift Supabase sync error:", e);
+            }
+        }
+
+        async function loadSupabaseData(userId) {
+            if (!supabaseClient || !userId) return;
+            try {
+                const { data: shifts, error } = await supabaseClient.from('shifts').select('*').order('date', { ascending: false });
+                if (shifts && shifts.length > 0) {
+                    if (!activeProfile) activeProfile = (profiles && profiles[0]) ? profiles[0] : { shifts: [] };
+                    activeProfile.shifts = shifts.map(s => ({
+                        id: s.id,
+                        employer_name: s.employer_name,
+                        role_name: s.role_name,
+                        date: s.date,
+                        start_time: s.start_time,
+                        end_time: s.end_time,
+                        unpaid_break_mins: s.unpaid_break_mins,
+                        paid_hours: parseFloat(s.paid_hours),
+                        hourly_rate: parseFloat(s.hourly_rate),
+                        gross_pay: parseFloat(s.gross_pay),
+                        ob_pay: parseFloat(s.ob_pay || 0),
+                        tips: parseFloat(s.tips || 0),
+                        expenses: parseFloat(s.expenses || 0),
+                        net_pay: parseFloat(s.net_pay),
+                        status: s.status || 'worked',
+                        notes: s.notes || ''
+                    }));
+                    renderDashboard();
+                    renderLedger();
+                    renderCalendar();
+                }
+            } catch (e) {
+                console.error("Error loading Supabase data:", e);
             }
         }
 
