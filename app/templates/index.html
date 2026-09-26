@@ -57,25 +57,6 @@
         </div>
 
         <div id="profiles-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-xl w-full"></div>
-
-        <!-- SUPABASE CLOUD ACCOUNT BANNER ON FRONT SCREEN -->
-        <div class="bg-white border border-stone-200 rounded-3xl p-5 max-w-xl w-full flex flex-col sm:flex-row sm:items-center justify-between gap-4 card-shadow">
-            <div class="flex items-center gap-3">
-                <div class="w-11 h-11 rounded-2xl bg-forest-900 text-cream-50 flex items-center justify-center font-bold shrink-0">
-                    <i data-lucide="database" class="w-5 h-5 text-rust-500"></i>
-                </div>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <span class="font-serif font-bold text-base text-forest-900">Supabase Cloud Account</span>
-                        <span id="front-supa-badge" class="text-[10px] bg-stone-100 text-stone-600 font-bold px-2 py-0.5 rounded-full">Offline / Local Mode</span>
-                    </div>
-                    <span id="front-supa-desc" class="text-xs text-stone-500 block">Permanent PostgreSQL history across iPhone, iPad & PC</span>
-                </div>
-            </div>
-            <button type="button" onclick="openCloudModal()" class="bg-rust-500 hover:bg-rust-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-md transition shrink-0">
-                <i data-lucide="cloud-lightning" class="w-4 h-4"></i> Cloud Account
-            </button>
-        </div>
     </div>
 
     <!-- 2. PIN PAD MODAL -->
@@ -139,10 +120,6 @@
                 <div class="flex items-center gap-2">
                     <button type="button" onclick="openShiftModal()" class="bg-forest-900 hover:bg-forest-800 text-cream-50 font-semibold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-md transition">
                         <i data-lucide="plus" class="w-4 h-4 text-rust-500"></i> <span class="hidden xs:inline">Log</span> Shift
-                    </button>
-
-                    <button type="button" onclick="openCloudModal()" class="bg-forest-900 hover:bg-forest-800 text-cream-50 font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-md transition" title="Supabase Cloud PostgreSQL Database">
-                        <i data-lucide="database" class="w-4 h-4 text-rust-500"></i> <span class="hidden sm:inline">Cloud DB</span>
                     </button>
                     
                     <button type="button" onclick="openAdminModal()" class="bg-rust-500 hover:bg-rust-600 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-sm transition">
@@ -1974,16 +1951,18 @@
         // ---------------------------------------------------------
         // 8. SUPABASE POSTGRESQL & AUTH CLIENT ENGINE
         // ---------------------------------------------------------
+        const DEFAULT_SUPABASE_URL = "https://nbxjfqfnxwazoskykgjl.supabase.co";
+        const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ieGpmcWZueHdhem9za3lrZ2psIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzNzY3MTEsImV4cCI6MjEwNTk1MjcxMX0.ozEAA4XaL6BrGUPL3D2GOKUCuKwAyqg4AuYfEo8KMao";
         let supabaseClient = null;
 
         function initSupabase() {
-            const url = localStorage.getItem("earnest_supa_url") || "";
-            const key = localStorage.getItem("earnest_supa_key") || "";
+            const url = localStorage.getItem("earnest_supa_url") || DEFAULT_SUPABASE_URL;
+            const key = localStorage.getItem("earnest_supa_key") || DEFAULT_SUPABASE_ANON_KEY;
 
             if (url && document.getElementById("supa-url")) document.getElementById("supa-url").value = url;
             if (key && document.getElementById("supa-key")) document.getElementById("supa-key").value = key;
 
-            if (url && key && window.supabase) {
+            if (window.supabase) {
                 try {
                     supabaseClient = window.supabase.createClient(url, key);
                     checkSupabaseUser();
