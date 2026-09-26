@@ -2189,6 +2189,17 @@
             }
         }
 
+        async function deleteProfileFromSupabase(profileId) {
+            if (!supabaseClient) return;
+            try {
+                let { data: { user } } = await supabaseClient.auth.getUser();
+                if (!user) return;
+                await supabaseClient.from('app_profiles').delete().eq('id', profileId).eq('user_id', user.id);
+            } catch(e) {
+                console.error("Profile Supabase deletion error:", e);
+            }
+        }
+
         async function deleteShiftFromSupabase(shiftId, shiftObj) {
             if (!supabaseClient) return;
             try {
@@ -2213,6 +2224,34 @@
         async function loadSupabaseData(userId) {
             if (!supabaseClient || !userId) return;
             try {
+                // Fetch App Profiles from Supabase
+                const { data: dbAppProfiles } = await supabaseClient.from('app_profiles').select('*').order('created_at', { ascending: true });
+                if (dbAppProfiles && dbAppProfiles.length > 0) {
+                    const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+                    profiles = dbAppProfiles.map(ap => {
+                        const existing = profileMap.get(ap.id) || {};
+                        return {
+                            id: ap.id,
+                            name: ap.name,
+                            avatar: ap.avatar || ap.name.charAt(0).toUpperCase(),
+                            pin: ap.pin || null,
+                            isAdmin: ap.is_admin || false,
+                            employers: existing.employers || defaultEmployers,
+                            shifts: existing.shifts || [],
+                            payslips: existing.payslips || [],
+                            goals: existing.goals || { hours: 100, net: 15000, shifts: 20 }
+                        };
+                    });
+                    saveProfiles();
+                    renderProfilesGrid();
+                    renderAdminProfilesList();
+                } else if (profiles && profiles.length > 0) {
+                    // Auto-sync existing local profiles to Supabase cloud
+                    for (const p of profiles) {
+                        await syncProfileToSupabase(p);
+                    }
+                }
+
                 // Fetch Employers
                 const { data: dbEmployers } = await supabaseClient.from('employers').select('*, roles(*)');
                 if (dbEmployers && dbEmployers.length > 0) {
